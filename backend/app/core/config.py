@@ -8,5 +8,9 @@ class Settings(BaseSettings):
     storage_dir: str = "/app/storage"
     app_env: str = "development"
 
+    jwt_secret_key: str = "dev-secret-change-me"
+    jwt_algorithm: str = "HS256"
+    jwt_expire_minutes: int = 480
+
 
 settings = Settings()
