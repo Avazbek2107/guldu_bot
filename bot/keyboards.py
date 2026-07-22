@@ -93,6 +93,7 @@ def ticket_actions_keyboard(ticket_id: int) -> InlineKeyboardMarkup:
     builder = InlineKeyboardBuilder()
     builder.button(text="✅ Yopish", callback_data=f"close:{ticket_id}")
     builder.button(text="↪️ Qayta yo'naltirish", callback_data=f"reassign:{ticket_id}")
+    builder.button(text="🧾 Ma'lumotnoma", callback_data=f"pdf:{ticket_id}")
     builder.adjust(1)
     return builder.as_markup()
 

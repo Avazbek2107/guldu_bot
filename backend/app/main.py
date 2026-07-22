@@ -2,7 +2,7 @@ from fastapi import Depends, FastAPI
 from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.api import auth, faculties, users
+from app.api import auth, faculties, tickets, users
 from app.core.database import get_db
 
 app = FastAPI(title="Technician Support Bot API")
@@ -10,6 +10,7 @@ app = FastAPI(title="Technician Support Bot API")
 app.include_router(auth.router)
 app.include_router(faculties.router)
 app.include_router(users.router)
+app.include_router(tickets.router)
 
 
 @app.get("/health")

@@ -1,13 +1,17 @@
+import asyncio
+
 from aiogram import F, Router
 from aiogram.filters import StateFilter
 from aiogram.fsm.context import FSMContext
-from aiogram.types import CallbackQuery, Message
+from aiogram.types import BufferedInputFile, CallbackQuery, Message
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.database import async_session_factory
 from app.models.enums import TicketStatus, UserRole
+from app.models.faculty import Faculty
 from app.models.ticket import Ticket
 from app.models.user import User
+from app.services.pdf_generator import generate_ticket_pdf
 
 from bot.keyboards import suspicious_keyboard, technician_choice_keyboard, ticket_actions_keyboard
 from bot.services.tickets import (
@@ -190,3 +194,26 @@ async def handle_rating_comment(message: Message, state: FSMContext) -> None:
 
     await state.clear()
     await message.answer("Rahmat! Bahoyingiz qabul qilindi.")
+
+
+@router.callback_query(F.data.startswith("pdf:"))
+async def handle_pdf(callback: CallbackQuery) -> None:
+    ticket_id = int(callback.data.split(":")[1])
+
+    async with async_session_factory() as db:
+        technician = await get_user_by_telegram_id(db, callback.from_user.id)
+        ticket = await _get_ticket(db, ticket_id)
+        if technician is None or ticket is None or technician.faculty_id != ticket.faculty_id:
+            await callback.answer("Sizda bu huquq yo'q", show_alert=True)
+            return
+
+        creator = await db.get(User, ticket.created_by_user_id)
+        faculty = await db.get(Faculty, ticket.faculty_id)
+        assigned = await db.get(User, ticket.assigned_technician_id) if ticket.assigned_technician_id else None
+
+        pdf_bytes = await asyncio.to_thread(generate_ticket_pdf, ticket, creator, faculty.name, assigned)
+
+    await callback.message.answer_document(
+        BufferedInputFile(pdf_bytes, filename=f"{ticket.ticket_number}.pdf"),
+    )
+    await callback.answer()
