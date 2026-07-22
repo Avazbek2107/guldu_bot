@@ -25,12 +25,20 @@ apiClient.interceptors.response.use(
   },
 );
 
-export async function downloadTicketPdf(ticketId: number, filename: string): Promise<void> {
-  const response = await apiClient.get(`/tickets/${ticketId}/pdf`, { responseType: "blob" });
-  const url = URL.createObjectURL(new Blob([response.data], { type: "application/pdf" }));
+export async function downloadBlob(
+  url: string,
+  params: Record<string, unknown> | undefined,
+  filename: string,
+): Promise<void> {
+  const response = await apiClient.get(url, { params, responseType: "blob" });
+  const blobUrl = URL.createObjectURL(new Blob([response.data]));
   const link = document.createElement("a");
-  link.href = url;
+  link.href = blobUrl;
   link.download = filename;
   link.click();
-  URL.revokeObjectURL(url);
+  URL.revokeObjectURL(blobUrl);
+}
+
+export async function downloadTicketPdf(ticketId: number, filename: string): Promise<void> {
+  await downloadBlob(`/tickets/${ticketId}/pdf`, undefined, filename);
 }

@@ -10,9 +10,9 @@ import {
   Tooltip,
   message,
 } from "antd";
-import { FilePdfOutlined } from "@ant-design/icons";
+import { FileExcelOutlined, FilePdfOutlined } from "@ant-design/icons";
 import { downloadTicketPdf } from "../api/client";
-import { closeTicket, listTickets, reassignTicket } from "../api/tickets";
+import { closeTicket, exportTickets, listTickets, reassignTicket, type TicketFilters } from "../api/tickets";
 import { listFaculties } from "../api/faculties";
 import { listUsers } from "../api/users";
 import { useAuth } from "../auth/AuthContext";
@@ -51,17 +51,32 @@ export function TicketsPage() {
   const [reassignTechnicianId, setReassignTechnicianId] = useState<number | undefined>();
   const [actionLoading, setActionLoading] = useState(false);
 
+  const currentFilters: TicketFilters = {
+    faculty_id: facultyFilter,
+    status: statusFilter,
+    category: categoryFilter as never,
+  };
+
   async function loadTickets() {
     setLoading(true);
     try {
-      const data = await listTickets({
-        faculty_id: facultyFilter,
-        status: statusFilter,
-        category: categoryFilter as never,
-      });
+      const data = await listTickets(currentFilters);
       setTickets(data);
     } finally {
       setLoading(false);
+    }
+  }
+
+  const [exportLoading, setExportLoading] = useState(false);
+
+  async function handleExport(format: "xlsx" | "pdf") {
+    setExportLoading(true);
+    try {
+      await exportTickets(currentFilters, format);
+    } catch {
+      message.error("Eksport qilishda xatolik yuz berdi");
+    } finally {
+      setExportLoading(false);
     }
   }
 
@@ -145,6 +160,12 @@ export function TicketsPage() {
           onChange={setCategoryFilter}
           options={Object.entries(CATEGORY_LABELS_UZ).map(([value, label]) => ({ value, label }))}
         />
+        <Button icon={<FileExcelOutlined />} loading={exportLoading} onClick={() => handleExport("xlsx")}>
+          Excel
+        </Button>
+        <Button icon={<FilePdfOutlined />} loading={exportLoading} onClick={() => handleExport("pdf")}>
+          PDF
+        </Button>
       </Space>
 
       <Table

@@ -1,4 +1,4 @@
-import { apiClient } from "./client";
+import { apiClient, downloadBlob } from "./client";
 import type { TicketCategory, TicketOut, TicketPriority, TicketStatus } from "../types";
 
 export interface TicketFilters {
@@ -28,4 +28,9 @@ export async function reassignTicket(id: number, technicianId: number): Promise<
     technician_id: technicianId,
   });
   return data;
+}
+
+export async function exportTickets(filters: TicketFilters | undefined, format: "xlsx" | "pdf"): Promise<void> {
+  const filename = `arizalar.${format}`;
+  await downloadBlob("/tickets/export", { ...filters, format }, filename);
 }

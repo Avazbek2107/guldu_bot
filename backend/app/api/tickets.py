@@ -1,4 +1,5 @@
 from datetime import date, datetime, timezone
+from typing import Literal
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Response, status
 from sqlalchemy import select
@@ -13,7 +14,8 @@ from app.models.rating import Rating
 from app.models.ticket import Ticket, TicketReassignment
 from app.models.user import User
 from app.schemas.ticket import TicketCloseRequest, TicketOut, TicketReassignRequest
-from app.services.pdf_generator import generate_ticket_pdf
+from app.services.excel_generator import generate_tickets_xlsx
+from app.services.pdf_generator import generate_ticket_pdf, generate_tickets_list_pdf
 
 router = APIRouter(prefix="/tickets", tags=["tickets"])
 
@@ -99,6 +101,47 @@ async def list_tickets(
     query = query.order_by(Ticket.created_at.desc())
     result = await db.execute(query)
     return [_row_to_ticket_out(row) for row in result.all()]
+
+
+@router.get("/export")
+async def export_tickets(
+    format: Literal["xlsx", "pdf"],
+    faculty_id: int | None = None,
+    status_filter: TicketStatus | None = Query(None, alias="status"),
+    technician_id: int | None = None,
+    category: TicketCategory | None = None,
+    priority: TicketPriority | None = None,
+    date_from: date | None = None,
+    date_to: date | None = None,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    tickets = await list_tickets(
+        faculty_id=faculty_id,
+        status_filter=status_filter,
+        technician_id=technician_id,
+        category=category,
+        priority=priority,
+        date_from=date_from,
+        date_to=date_to,
+        db=db,
+        current_user=current_user,
+    )
+
+    if format == "xlsx":
+        content = generate_tickets_xlsx(tickets)
+        media_type = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+        filename = "arizalar.xlsx"
+    else:
+        content = generate_tickets_list_pdf(tickets)
+        media_type = "application/pdf"
+        filename = "arizalar.pdf"
+
+    return Response(
+        content=content,
+        media_type=media_type,
+        headers={"Content-Disposition": f"attachment; filename={filename}"},
+    )
 
 
 @router.get("/{ticket_id}", response_model=TicketOut)
