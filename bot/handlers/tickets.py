@@ -63,8 +63,18 @@ async def start_new_ticket(message: Message, state: FSMContext) -> None:
     user = await _require_active_faculty_staff(message)
     if user is None:
         return
+    await state.set_state(NewTicket.waiting_category)
+    await message.answer("Muammo toifasini tanlang:", reply_markup=category_keyboard())
+
+
+@router.callback_query(StateFilter(NewTicket.waiting_category), F.data.startswith("category:"))
+async def handle_category(callback: CallbackQuery, state: FSMContext) -> None:
+    category = callback.data.split(":")[1]
+    await state.update_data(category=category)
     await state.set_state(NewTicket.waiting_description)
-    await message.answer("Muammoni qisqacha tavsiflab bering:")
+    await callback.message.edit_reply_markup(reply_markup=None)
+    await callback.message.answer("Muammoni qisqacha tavsiflab bering:")
+    await callback.answer()
 
 
 @router.message(StateFilter(NewTicket.waiting_description))
@@ -74,18 +84,8 @@ async def handle_description(message: Message, state: FSMContext) -> None:
         await message.answer("Iltimos, muammoni matn ko'rinishida yozing.")
         return
     await state.update_data(description=description)
-    await state.set_state(NewTicket.waiting_category)
-    await message.answer("Muammo toifasini tanlang:", reply_markup=category_keyboard())
-
-
-@router.callback_query(StateFilter(NewTicket.waiting_category), F.data.startswith("category:"))
-async def handle_category(callback: CallbackQuery, state: FSMContext) -> None:
-    category = callback.data.split(":")[1]
-    await state.update_data(category=category)
     await state.set_state(NewTicket.waiting_priority)
-    await callback.message.edit_reply_markup(reply_markup=None)
-    await callback.message.answer("Muhimlik darajasini tanlang:", reply_markup=priority_keyboard())
-    await callback.answer()
+    await message.answer("Muhimlik darajasini tanlang:", reply_markup=priority_keyboard())
 
 
 @router.callback_query(StateFilter(NewTicket.waiting_priority), F.data.startswith("priority:"))

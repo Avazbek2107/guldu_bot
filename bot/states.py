@@ -11,8 +11,8 @@ class ProfileChange(StatesGroup):
 
 
 class NewTicket(StatesGroup):
-    waiting_description = State()
     waiting_category = State()
+    waiting_description = State()
     waiting_priority = State()
     waiting_attachment = State()
     confirm = State()
