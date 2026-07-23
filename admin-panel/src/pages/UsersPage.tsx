@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { Button, Form, Input, Modal, Popconfirm, Select, Space, Table, Tag, message } from "antd";
+import { Button, Form, Input, InputNumber, Modal, Popconfirm, Select, Space, Table, Tag, message } from "antd";
 import { PlusOutlined } from "@ant-design/icons";
 import {
   blockUser,
@@ -62,7 +62,13 @@ export function UsersPage() {
     }
   }
 
-  async function handleEditSave(values: { full_name: string; phone: string; faculty_id?: number; password?: string }) {
+  async function handleEditSave(values: {
+    full_name: string;
+    phone: string;
+    faculty_id?: number;
+    password?: string;
+    telegram_id?: number;
+  }) {
     if (!editTarget) return;
     setSaving(true);
     try {
@@ -71,6 +77,7 @@ export function UsersPage() {
         phone: values.phone,
         faculty_id: values.faculty_id ?? null,
         password: values.password || undefined,
+        telegram_id: values.telegram_id ?? null,
       });
       message.success("Saqlandi");
       setEditTarget(null);
@@ -134,6 +141,12 @@ export function UsersPage() {
           { title: "Rol", dataIndex: "role", render: (v: UserRole) => ROLE_LABELS_UZ[v] },
           { title: "Fakultet", dataIndex: "faculty_id", render: (v: number | null) => facultyName(v) },
           {
+            title: "Telegram",
+            dataIndex: "telegram_id",
+            render: (v: number | null) =>
+              v != null ? <Tag color="blue">Bog'langan ({v})</Tag> : <Tag>Bog'lanmagan</Tag>,
+          },
+          {
             title: "Holat",
             key: "status",
             render: (_: unknown, record: UserOut) => (
@@ -157,6 +170,7 @@ export function UsersPage() {
                       full_name: record.full_name,
                       phone: record.phone,
                       faculty_id: record.faculty_id ?? undefined,
+                      telegram_id: record.telegram_id ?? undefined,
                     });
                   }}
                 >
@@ -192,10 +206,24 @@ export function UsersPage() {
           <Form.Item name="phone" label="Telefon" rules={[{ required: true }]}>
             <Input placeholder="+998901234567" />
           </Form.Item>
-          <Form.Item name="username" label="Login" rules={[{ required: true }]}>
+          <Form.Item
+            name="username"
+            label="Login"
+            rules={[
+              { required: true, message: "Loginni kiriting" },
+              { min: 3, message: "Login kamida 3 belgidan iborat bo'lishi kerak" },
+            ]}
+          >
             <Input />
           </Form.Item>
-          <Form.Item name="password" label="Parol" rules={[{ required: true }]}>
+          <Form.Item
+            name="password"
+            label="Parol"
+            rules={[
+              { required: true, message: "Parolni kiriting" },
+              { min: 8, message: "Parol kamida 8 belgidan iborat bo'lishi kerak" },
+            ]}
+          >
             <Input.Password />
           </Form.Item>
           <Form.Item name="role" label="Rol" rules={[{ required: true }]}>
@@ -207,6 +235,13 @@ export function UsersPage() {
               placeholder="Super Admin uchun bo'sh qoldiring"
               options={faculties.map((f) => ({ value: f.id, label: f.name }))}
             />
+          </Form.Item>
+          <Form.Item
+            name="telegram_id"
+            label="Telegram ID (ixtiyoriy)"
+            extra="Botga @userinfobot orqali xodimning Telegram ID'sini bilib oling. Bo'sh qoldirsangiz, xodim botda /start bosib telefon raqamini ulashganda avtomatik bog'lanadi."
+          >
+            <InputNumber style={{ width: "100%" }} placeholder="Masalan: 123456789" controls={false} />
           </Form.Item>
         </Form>
       </Modal>
@@ -230,7 +265,18 @@ export function UsersPage() {
           <Form.Item name="faculty_id" label="Fakultet">
             <Select allowClear options={faculties.map((f) => ({ value: f.id, label: f.name }))} />
           </Form.Item>
-          <Form.Item name="password" label="Yangi parol (ixtiyoriy)">
+          <Form.Item
+            name="telegram_id"
+            label="Telegram ID (ixtiyoriy)"
+            extra="Botga @userinfobot orqali xodimning Telegram ID'sini bilib oling."
+          >
+            <InputNumber style={{ width: "100%" }} placeholder="Masalan: 123456789" controls={false} />
+          </Form.Item>
+          <Form.Item
+            name="password"
+            label="Yangi parol (ixtiyoriy)"
+            rules={[{ min: 8, message: "Parol kamida 8 belgidan iborat bo'lishi kerak" }]}
+          >
             <Input.Password placeholder="O'zgartirish uchun kiriting" />
           </Form.Item>
         </Form>

@@ -42,8 +42,8 @@ async def cmd_start(message: Message, state: FSMContext) -> None:
 @router.message(F.contact)
 async def handle_contact(message: Message, state: FSMContext) -> None:
     contact = message.contact
-    if contact.user_id is not None and contact.user_id != message.from_user.id:
-        await message.answer("Iltimos, o'zingizning kontaktingizni yuboring.")
+    if contact.user_id != message.from_user.id:
+        await message.answer("Iltimos, pastdagi tugma orqali o'zingizning kontaktingizni yuboring.")
         return
 
     phone = contact.phone_number

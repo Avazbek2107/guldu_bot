@@ -1,5 +1,6 @@
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy import select
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.api.deps import get_current_user, require_roles
@@ -26,7 +27,14 @@ async def create_faculty(
 ):
     faculty = Faculty(name=payload.name)
     db.add(faculty)
-    await db.commit()
+    try:
+        await db.commit()
+    except IntegrityError as exc:
+        await db.rollback()
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="Bu nomdagi fakultet allaqachon mavjud",
+        ) from exc
     await db.refresh(faculty)
     return faculty
 
@@ -42,7 +50,14 @@ async def update_faculty(
     if faculty is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Fakultet topilmadi")
     faculty.name = payload.name
-    await db.commit()
+    try:
+        await db.commit()
+    except IntegrityError as exc:
+        await db.rollback()
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="Bu nomdagi fakultet allaqachon mavjud",
+        ) from exc
     await db.refresh(faculty)
     return faculty
 

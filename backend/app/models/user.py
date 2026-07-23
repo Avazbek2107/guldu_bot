@@ -1,4 +1,4 @@
-from sqlalchemy import Boolean, ForeignKey, Index, String
+from sqlalchemy import BigInteger, Boolean, ForeignKey, Index, String
 from sqlalchemy import Enum as SAEnum
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
@@ -19,7 +19,7 @@ class User(Base, TimestampMixin):
 
     id: Mapped[int] = mapped_column(primary_key=True)
 
-    telegram_id: Mapped[int | None] = mapped_column(unique=True, nullable=True)
+    telegram_id: Mapped[int | None] = mapped_column(BigInteger, unique=True, nullable=True)
     username: Mapped[str | None] = mapped_column(String(100), unique=True, nullable=True)
     password_hash: Mapped[str | None] = mapped_column(String(255), nullable=True)
 
@@ -27,7 +27,10 @@ class User(Base, TimestampMixin):
     phone: Mapped[str] = mapped_column(String(32), nullable=False)
 
     faculty_id: Mapped[int | None] = mapped_column(ForeignKey("faculties.id"), nullable=True)
-    role: Mapped[UserRole] = mapped_column(SAEnum(UserRole, name="user_role"), nullable=False)
+    role: Mapped[UserRole] = mapped_column(
+        SAEnum(UserRole, name="user_role", values_callable=lambda enum_cls: [e.value for e in enum_cls]),
+        nullable=False,
+    )
 
     is_blocked: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
     is_suspicious: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)

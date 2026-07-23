@@ -55,6 +55,7 @@ async def create_user(payload: UserCreate, db: AsyncSession = Depends(get_db)):
         phone=payload.phone,
         role=payload.role,
         faculty_id=payload.faculty_id,
+        telegram_id=payload.telegram_id,
     )
     db.add(user)
     try:
@@ -63,7 +64,7 @@ async def create_user(payload: UserCreate, db: AsyncSession = Depends(get_db)):
         await db.rollback()
         raise HTTPException(
             status_code=status.HTTP_409_CONFLICT,
-            detail="Bu username band yoki fakultetda allaqachon asosiy texnik xodim bor",
+            detail="Bu username, Telegram ID band yoki fakultetda allaqachon asosiy texnik xodim bor",
         ) from exc
     await db.refresh(user)
     return user
@@ -81,7 +82,14 @@ async def update_user(user_id: int, payload: UserUpdate, db: AsyncSession = Depe
     if payload.password is not None:
         user.password_hash = hash_password(payload.password)
 
-    await db.commit()
+    try:
+        await db.commit()
+    except IntegrityError as exc:
+        await db.rollback()
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="Bu Telegram ID allaqachon boshqa foydalanuvchiga bog'langan",
+        ) from exc
     await db.refresh(user)
     return user
 

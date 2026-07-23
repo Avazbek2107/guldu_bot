@@ -1,6 +1,6 @@
 from datetime import datetime, timedelta, timezone
 
-from sqlalchemy import func, select
+from sqlalchemy import func, select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models.enums import AttachmentType, TicketCategory, TicketPriority, TicketStatus, UserRole
@@ -92,11 +92,22 @@ def can_close_ticket(ticket: Ticket, user: User) -> bool:
     return user.role == UserRole.SUPER_ADMIN
 
 
-async def accept_ticket(db: AsyncSession, ticket: Ticket, technician: User) -> None:
-    ticket.status = TicketStatus.IN_PROGRESS
-    ticket.accepted_at = datetime.now(timezone.utc)
-    ticket.assigned_technician_id = technician.id
+async def accept_ticket(db: AsyncSession, ticket: Ticket, technician: User) -> bool:
+    """Atomically claim an open ticket. Returns False if another technician already accepted it."""
+    result = await db.execute(
+        update(Ticket)
+        .where(Ticket.id == ticket.id, Ticket.status == TicketStatus.OPEN)
+        .values(
+            status=TicketStatus.IN_PROGRESS,
+            accepted_at=datetime.now(timezone.utc),
+            assigned_technician_id=technician.id,
+        )
+    )
     await db.commit()
+    if result.rowcount == 0:
+        return False
+    await db.refresh(ticket)
+    return True
 
 
 async def close_ticket(

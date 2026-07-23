@@ -99,6 +99,19 @@ async def get_dashboard_stats(db: AsyncSession = Depends(get_db)):
         await db.execute(select(func.count()).select_from(Ticket).where(Ticket.sla_breach_notified_at.is_not(None)))
     ).scalar_one()
 
+    now = datetime.now(timezone.utc)
+    sla_open_breach_count = (
+        await db.execute(
+            select(func.count())
+            .select_from(Ticket)
+            .where(
+                Ticket.status.in_([TicketStatus.OPEN, TicketStatus.IN_PROGRESS]),
+                Ticket.sla_deadline.is_not(None),
+                Ticket.sla_deadline < now,
+            )
+        )
+    ).scalar_one()
+
     suspicious_user_count = (
         await db.execute(select(func.count()).select_from(User).where(User.is_suspicious.is_(True)))
     ).scalar_one()
@@ -106,14 +119,14 @@ async def get_dashboard_stats(db: AsyncSession = Depends(get_db)):
         await db.execute(select(func.count()).select_from(User).where(User.is_blocked.is_(True)))
     ).scalar_one()
 
-    trend_start = datetime.now(timezone.utc) - timedelta(days=TREND_DAYS)
+    trend_start = now - timedelta(days=TREND_DAYS)
     recent_created_ats = (
         await db.execute(select(Ticket.created_at).where(Ticket.created_at >= trend_start))
     ).scalars().all()
     day_counts = Counter(created_at.date().isoformat() for created_at in recent_created_ats)
     daily_trend = []
     for offset in range(TREND_DAYS, -1, -1):
-        day = (datetime.now(timezone.utc) - timedelta(days=offset)).date().isoformat()
+        day = (now - timedelta(days=offset)).date().isoformat()
         daily_trend.append(DailyCount(date=day, count=day_counts.get(day, 0)))
 
     return DashboardStats(
@@ -126,6 +139,7 @@ async def get_dashboard_stats(db: AsyncSession = Depends(get_db)):
         category_stats=category_stats,
         average_rating=float(average_rating) if average_rating is not None else None,
         sla_breach_count=sla_breach_count,
+        sla_open_breach_count=sla_open_breach_count,
         suspicious_user_count=suspicious_user_count,
         blocked_user_count=blocked_user_count,
         daily_trend=daily_trend,

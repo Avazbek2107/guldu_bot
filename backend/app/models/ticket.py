@@ -1,6 +1,6 @@
 from datetime import datetime
 
-from sqlalchemy import Boolean, DateTime, ForeignKey, String, Text, func
+from sqlalchemy import Boolean, DateTime, ForeignKey, Index, String, Text, func
 from sqlalchemy import Enum as SAEnum
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
@@ -8,23 +8,35 @@ from app.models.base import Base, TimestampMixin
 from app.models.enums import AttachmentType, TicketCategory, TicketPriority, TicketStatus
 
 
+def _enum_values(enum_cls):
+    return [e.value for e in enum_cls]
+
+
 class Ticket(Base, TimestampMixin):
     __tablename__ = "tickets"
+    __table_args__ = (Index("ix_tickets_created_at", "created_at"),)
 
     id: Mapped[int] = mapped_column(primary_key=True)
     ticket_number: Mapped[str] = mapped_column(String(32), unique=True, nullable=False)
 
     created_by_user_id: Mapped[int] = mapped_column(ForeignKey("users.id"), nullable=False)
-    faculty_id: Mapped[int] = mapped_column(ForeignKey("faculties.id"), nullable=False)
+    faculty_id: Mapped[int] = mapped_column(ForeignKey("faculties.id"), nullable=False, index=True)
 
-    category: Mapped[TicketCategory] = mapped_column(SAEnum(TicketCategory, name="ticket_category"), nullable=False)
-    priority: Mapped[TicketPriority] = mapped_column(SAEnum(TicketPriority, name="ticket_priority"), nullable=False)
+    category: Mapped[TicketCategory] = mapped_column(
+        SAEnum(TicketCategory, name="ticket_category", values_callable=_enum_values), nullable=False
+    )
+    priority: Mapped[TicketPriority] = mapped_column(
+        SAEnum(TicketPriority, name="ticket_priority", values_callable=_enum_values), nullable=False
+    )
     description: Mapped[str] = mapped_column(Text, nullable=False)
 
     status: Mapped[TicketStatus] = mapped_column(
-        SAEnum(TicketStatus, name="ticket_status"), default=TicketStatus.OPEN, nullable=False
+        SAEnum(TicketStatus, name="ticket_status", values_callable=_enum_values),
+        default=TicketStatus.OPEN,
+        nullable=False,
+        index=True,
     )
-    assigned_technician_id: Mapped[int | None] = mapped_column(ForeignKey("users.id"), nullable=True)
+    assigned_technician_id: Mapped[int | None] = mapped_column(ForeignKey("users.id"), nullable=True, index=True)
 
     resolution_comment: Mapped[str | None] = mapped_column(Text, nullable=True)
 
@@ -56,7 +68,9 @@ class TicketAttachment(Base):
     id: Mapped[int] = mapped_column(primary_key=True)
     ticket_id: Mapped[int] = mapped_column(ForeignKey("tickets.id"), nullable=False)
     file_path: Mapped[str] = mapped_column(String(500), nullable=False)
-    file_type: Mapped[AttachmentType] = mapped_column(SAEnum(AttachmentType, name="attachment_type"), nullable=False)
+    file_type: Mapped[AttachmentType] = mapped_column(
+        SAEnum(AttachmentType, name="attachment_type", values_callable=_enum_values), nullable=False
+    )
     uploaded_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
 
     ticket: Mapped["Ticket"] = relationship(back_populates="attachments")

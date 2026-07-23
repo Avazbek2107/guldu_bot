@@ -21,6 +21,7 @@ import {
   PRIORITY_LABELS_UZ,
   STATUS_LABELS_UZ,
   type FacultyOut,
+  type TicketCategory,
   type TicketOut,
   type TicketStatus,
   type UserOut,
@@ -43,7 +44,7 @@ export function TicketsPage() {
 
   const [facultyFilter, setFacultyFilter] = useState<number | undefined>();
   const [statusFilter, setStatusFilter] = useState<TicketStatus | undefined>();
-  const [categoryFilter, setCategoryFilter] = useState<string | undefined>();
+  const [categoryFilter, setCategoryFilter] = useState<TicketCategory | undefined>();
 
   const [closeTarget, setCloseTarget] = useState<TicketOut | null>(null);
   const [resolutionComment, setResolutionComment] = useState("");
@@ -54,7 +55,7 @@ export function TicketsPage() {
   const currentFilters: TicketFilters = {
     faculty_id: facultyFilter,
     status: statusFilter,
-    category: categoryFilter as never,
+    category: categoryFilter,
   };
 
   async function loadTickets() {
@@ -68,6 +69,18 @@ export function TicketsPage() {
   }
 
   const [exportLoading, setExportLoading] = useState(false);
+  const [pdfLoadingId, setPdfLoadingId] = useState<number | null>(null);
+
+  async function handlePdfDownload(record: TicketOut) {
+    setPdfLoadingId(record.id);
+    try {
+      await downloadTicketPdf(record.id, `${record.ticket_number}.pdf`);
+    } catch {
+      message.error("Ma'lumotnomani yuklab olishda xatolik yuz berdi");
+    } finally {
+      setPdfLoadingId(null);
+    }
+  }
 
   async function handleExport(format: "xlsx" | "pdf") {
     setExportLoading(true);
@@ -212,7 +225,8 @@ export function TicketsPage() {
                   <Button
                     size="small"
                     icon={<FilePdfOutlined />}
-                    onClick={() => downloadTicketPdf(record.id, `${record.ticket_number}.pdf`)}
+                    loading={pdfLoadingId === record.id}
+                    onClick={() => handlePdfDownload(record)}
                   />
                 </Tooltip>
                 {record.status !== "closed" && (

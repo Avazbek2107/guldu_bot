@@ -48,6 +48,7 @@ export interface UserOut {
   phone: string;
   role: UserRole;
   faculty_id: number | null;
+  telegram_id: number | null;
   is_blocked: boolean;
   is_suspicious: boolean;
 }
@@ -119,6 +120,7 @@ export interface DashboardStats {
   category_stats: CategoryStat[];
   average_rating: number | null;
   sla_breach_count: number;
+  sla_open_breach_count: number;
   suspicious_user_count: number;
   blocked_user_count: number;
   daily_trend: DailyCount[];

@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
-import { Card, Col, Row, Statistic, Spin, Table } from "antd";
+import { Card, Col, Row, Statistic, Spin, Table, Tooltip as AntTooltip } from "antd";
+import { InfoCircleOutlined } from "@ant-design/icons";
 import {
   Bar,
   BarChart,
@@ -52,35 +53,56 @@ export function DashboardPage() {
 
   return (
     <div>
-      <Row gutter={16}>
-        <Col span={4}>
+      <Row gutter={[16, 16]}>
+        <Col span={3}>
           <Card>
             <Statistic title="Jami arizalar" value={stats.total_tickets} />
           </Card>
         </Col>
-        <Col span={4}>
+        <Col span={3}>
           <Card>
             <Statistic title="Ochiq" value={stats.open_tickets} valueStyle={{ color: "#faad14" }} />
           </Card>
         </Col>
-        <Col span={4}>
+        <Col span={3}>
           <Card>
             <Statistic title="Jarayonda" value={stats.in_progress_tickets} valueStyle={{ color: "#1677ff" }} />
           </Card>
         </Col>
-        <Col span={4}>
+        <Col span={3}>
           <Card>
             <Statistic title="Yopilgan" value={stats.closed_tickets} valueStyle={{ color: "#52c41a" }} />
           </Card>
         </Col>
-        <Col span={4}>
+        <Col span={3}>
           <Card>
             <Statistic title="O'rtacha baho" value={stats.average_rating ?? 0} precision={1} suffix="/ 5" />
           </Card>
         </Col>
         <Col span={4}>
           <Card>
-            <Statistic title="SLA buzilishi" value={stats.sla_breach_count} valueStyle={{ color: "#ff4d4f" }} />
+            <Statistic
+              title={
+                <AntTooltip title="Muddati o'tib ketgan va hozir ham hali ochiq/jarayonda turgan arizalar soni — darhol e'tibor talab qiladi">
+                  Hozir muddati o'tgan <InfoCircleOutlined style={{ fontSize: 12 }} />
+                </AntTooltip>
+              }
+              value={stats.sla_open_breach_count}
+              valueStyle={{ color: "#ff4d4f" }}
+            />
+          </Card>
+        </Col>
+        <Col span={5}>
+          <Card>
+            <Statistic
+              title={
+                <AntTooltip title="Yaratilgandan buyon SLA muddati kamida bir marta buzilgan barcha arizalar (yopilganlari ham hisobga kiradi) — umumiy, kamaymaydigan hisoblagich">
+                  SLA buzilishi (jami) <InfoCircleOutlined style={{ fontSize: 12 }} />
+                </AntTooltip>
+              }
+              value={stats.sla_breach_count}
+              valueStyle={{ color: "#cf7000" }}
+            />
           </Card>
         </Col>
       </Row>

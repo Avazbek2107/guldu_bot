@@ -55,7 +55,11 @@ async def handle_accept(callback: CallbackQuery) -> None:
             await callback.answer("Bu ariza allaqachon qabul qilingan", show_alert=True)
             return
 
-        await accept_ticket(db, ticket, technician)
+        accepted = await accept_ticket(db, ticket, technician)
+        if not accepted:
+            await callback.answer("Bu ariza allaqachon boshqa texnik xodim tomonidan qabul qilingan", show_alert=True)
+            await callback.message.edit_reply_markup(reply_markup=None)
+            return
         creator = await db.get(User, ticket.created_by_user_id)
         await notify_ticket_accepted(callback.bot, ticket, creator)
 
@@ -88,10 +92,16 @@ async def handle_close_comment(message: Message, state: FSMContext) -> None:
     await message.answer("Bu chaqiruv shubhalimi?", reply_markup=suspicious_keyboard(data["ticket_id"]))
 
 
-async def _do_close(bot, state: FSMContext, ticket_id: int, is_suspicious: bool, suspicious_comment: str | None) -> Ticket:
+async def _do_close(
+    bot, state: FSMContext, telegram_id: int, ticket_id: int, is_suspicious: bool, suspicious_comment: str | None
+) -> Ticket | None:
     data = await state.get_data()
     async with async_session_factory() as db:
+        technician = await get_user_by_telegram_id(db, telegram_id)
         ticket = await _get_ticket(db, ticket_id)
+        if technician is None or ticket is None or not can_close_ticket(ticket, technician):
+            await state.clear()
+            return None
         await close_ticket(db, ticket, data.get("resolution_comment"), is_suspicious, suspicious_comment)
         creator = await db.get(User, ticket.created_by_user_id)
         await notify_ticket_closed_request_rating(bot, ticket, creator)
@@ -103,6 +113,10 @@ async def _do_close(bot, state: FSMContext, ticket_id: int, is_suspicious: bool,
 async def handle_suspicious_choice(callback: CallbackQuery, state: FSMContext) -> None:
     _, choice, ticket_id_str = callback.data.split(":")
     ticket_id = int(ticket_id_str)
+    data = await state.get_data()
+    if data.get("ticket_id") != ticket_id:
+        await callback.answer("Amal muddati tugagan, qaytadan boshlang", show_alert=True)
+        return
     await callback.message.edit_reply_markup(reply_markup=None)
 
     if choice == "yes":
@@ -112,7 +126,11 @@ async def handle_suspicious_choice(callback: CallbackQuery, state: FSMContext) -
         await callback.answer()
         return
 
-    ticket = await _do_close(callback.bot, state, ticket_id, False, None)
+    ticket = await _do_close(callback.bot, state, callback.from_user.id, ticket_id, False, None)
+    if ticket is None:
+        await callback.message.answer("Amalni bajarib bo'lmadi: ariza topilmadi yoki huquqingiz yo'q.")
+        await callback.answer()
+        return
     await callback.message.answer(f"✅ Ariza #{ticket.ticket_number} yopildi.")
     await callback.answer()
 
@@ -120,7 +138,10 @@ async def handle_suspicious_choice(callback: CallbackQuery, state: FSMContext) -
 @router.message(StateFilter(CloseTicket.waiting_suspicious_comment))
 async def handle_suspicious_comment(message: Message, state: FSMContext) -> None:
     data = await state.get_data()
-    ticket = await _do_close(message.bot, state, data["ticket_id"], True, message.text)
+    ticket = await _do_close(message.bot, state, message.from_user.id, data["ticket_id"], True, message.text)
+    if ticket is None:
+        await message.answer("Amalni bajarib bo'lmadi: ariza topilmadi yoki huquqingiz yo'q.")
+        return
     await message.answer(f"✅ Ariza #{ticket.ticket_number} yopildi.")
 
 
@@ -131,7 +152,12 @@ async def handle_reassign_start(callback: CallbackQuery, state: FSMContext) -> N
     async with async_session_factory() as db:
         technician = await get_user_by_telegram_id(db, callback.from_user.id)
         ticket = await _get_ticket(db, ticket_id)
-        if technician is None or ticket is None or technician.faculty_id != ticket.faculty_id:
+        if (
+            technician is None
+            or ticket is None
+            or technician.role not in (UserRole.TECHNICIAN_MAIN, UserRole.TECHNICIAN_BACKUP)
+            or technician.faculty_id != ticket.faculty_id
+        ):
             await callback.answer("Sizda bu huquq yo'q", show_alert=True)
             return
         candidates = await get_faculty_technicians(db, ticket.faculty_id, exclude_user_id=technician.id)
@@ -150,7 +176,13 @@ async def handle_reassign_start(callback: CallbackQuery, state: FSMContext) -> N
 @router.callback_query(F.data.startswith("reassign_to:"))
 async def handle_reassign_target(callback: CallbackQuery, state: FSMContext) -> None:
     _, ticket_id_str, target_id_str = callback.data.split(":")
-    await state.update_data(ticket_id=int(ticket_id_str), target_technician_id=int(target_id_str))
+    ticket_id = int(ticket_id_str)
+    data = await state.get_data()
+    if data.get("ticket_id") != ticket_id:
+        await callback.answer("Amal muddati tugagan, qaytadan boshlang", show_alert=True)
+        return
+
+    await state.update_data(target_technician_id=int(target_id_str))
     await state.set_state(ReassignTicket.waiting_reason)
     await callback.message.edit_reply_markup(reply_markup=None)
     await callback.message.answer("Qayta yo'naltirish sababini yozing:")
@@ -166,6 +198,17 @@ async def handle_reassign_reason(message: Message, state: FSMContext) -> None:
         from_technician = await get_user_by_telegram_id(db, message.from_user.id)
         ticket = await _get_ticket(db, data["ticket_id"])
         to_technician = await db.get(User, data["target_technician_id"])
+        if (
+            from_technician is None
+            or ticket is None
+            or to_technician is None
+            or from_technician.role not in (UserRole.TECHNICIAN_MAIN, UserRole.TECHNICIAN_BACKUP)
+            or from_technician.faculty_id != ticket.faculty_id
+            or to_technician.faculty_id != ticket.faculty_id
+        ):
+            await state.clear()
+            await message.answer("Amalni bajarib bo'lmadi: ariza topilmadi yoki huquqingiz yo'q.")
+            return
         await reassign_ticket(db, ticket, from_technician, to_technician, reason)
         await notify_reassignment(message.bot, db, ticket, to_technician, reason)
 
@@ -176,7 +219,16 @@ async def handle_reassign_reason(message: Message, state: FSMContext) -> None:
 @router.callback_query(F.data.startswith("rate:"))
 async def handle_rate(callback: CallbackQuery, state: FSMContext) -> None:
     _, ticket_id_str, stars_str = callback.data.split(":")
-    await state.update_data(ticket_id=int(ticket_id_str), stars=int(stars_str))
+    ticket_id = int(ticket_id_str)
+
+    async with async_session_factory() as db:
+        user = await get_user_by_telegram_id(db, callback.from_user.id)
+        ticket = await _get_ticket(db, ticket_id)
+        if user is None or ticket is None or ticket.created_by_user_id != user.id:
+            await callback.answer("Sizda bu huquq yo'q", show_alert=True)
+            return
+
+    await state.update_data(ticket_id=ticket_id, stars=int(stars_str))
     await state.set_state(RatingFlow.waiting_comment)
     await callback.message.edit_reply_markup(reply_markup=None)
     await callback.message.answer("Izoh qoldirmoqchimisiz? Yozing yoki '-' yuboring:")
@@ -190,6 +242,10 @@ async def handle_rating_comment(message: Message, state: FSMContext) -> None:
 
     async with async_session_factory() as db:
         ticket = await _get_ticket(db, data["ticket_id"])
+        if ticket is None:
+            await state.clear()
+            await message.answer("Ariza topilmadi.")
+            return
         await record_rating(db, ticket, data["stars"], None if comment == "-" else comment)
 
     await state.clear()
@@ -203,7 +259,12 @@ async def handle_pdf(callback: CallbackQuery) -> None:
     async with async_session_factory() as db:
         technician = await get_user_by_telegram_id(db, callback.from_user.id)
         ticket = await _get_ticket(db, ticket_id)
-        if technician is None or ticket is None or technician.faculty_id != ticket.faculty_id:
+        if (
+            technician is None
+            or ticket is None
+            or technician.role not in (UserRole.TECHNICIAN_MAIN, UserRole.TECHNICIAN_BACKUP, UserRole.SUPER_ADMIN)
+            or (technician.role != UserRole.SUPER_ADMIN and technician.faculty_id != ticket.faculty_id)
+        ):
             await callback.answer("Sizda bu huquq yo'q", show_alert=True)
             return
 

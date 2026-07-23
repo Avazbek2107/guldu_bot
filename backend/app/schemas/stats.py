@@ -41,6 +41,7 @@ class DashboardStats(BaseModel):
     category_stats: list[CategoryStat]
     average_rating: float | None
     sla_breach_count: int
+    sla_open_breach_count: int
     suspicious_user_count: int
     blocked_user_count: int
     daily_trend: list[DailyCount]

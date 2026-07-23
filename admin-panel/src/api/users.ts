@@ -8,6 +8,7 @@ export interface UserCreatePayload {
   phone: string;
   role: UserRole;
   faculty_id: number | null;
+  telegram_id?: number | null;
 }
 
 export interface UserUpdatePayload {
@@ -15,6 +16,7 @@ export interface UserUpdatePayload {
   phone?: string;
   faculty_id?: number | null;
   password?: string;
+  telegram_id?: number | null;
 }
 
 export async function listUsers(params?: { role?: UserRole; faculty_id?: number }): Promise<UserOut[]> {
