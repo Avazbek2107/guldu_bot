@@ -21,12 +21,11 @@ from bot.services.tickets import (
     get_faculty_technicians,
     notify_reassignment,
     notify_ticket_accepted,
-    notify_ticket_closed_request_rating,
+    notify_ticket_closed,
     reassign_ticket,
-    record_rating,
 )
 from bot.services.users import get_user_by_telegram_id
-from bot.states import CloseTicket, RatingFlow, ReassignTicket
+from bot.states import CloseTicket, ReassignTicket
 
 router = Router(name="technician")
 
@@ -104,7 +103,7 @@ async def _do_close(
             return None
         await close_ticket(db, ticket, data.get("resolution_comment"), is_suspicious, suspicious_comment)
         creator = await db.get(User, ticket.created_by_user_id)
-        await notify_ticket_closed_request_rating(bot, ticket, creator)
+        await notify_ticket_closed(bot, ticket, creator)
     await state.clear()
     return ticket
 
@@ -214,42 +213,6 @@ async def handle_reassign_reason(message: Message, state: FSMContext) -> None:
 
     await state.clear()
     await message.answer(f"✅ Ariza #{ticket.ticket_number} {to_technician.full_name}ga qayta yo'naltirildi.")
-
-
-@router.callback_query(F.data.startswith("rate:"))
-async def handle_rate(callback: CallbackQuery, state: FSMContext) -> None:
-    _, ticket_id_str, stars_str = callback.data.split(":")
-    ticket_id = int(ticket_id_str)
-
-    async with async_session_factory() as db:
-        user = await get_user_by_telegram_id(db, callback.from_user.id)
-        ticket = await _get_ticket(db, ticket_id)
-        if user is None or ticket is None or ticket.created_by_user_id != user.id:
-            await callback.answer("Sizda bu huquq yo'q", show_alert=True)
-            return
-
-    await state.update_data(ticket_id=ticket_id, stars=int(stars_str))
-    await state.set_state(RatingFlow.waiting_comment)
-    await callback.message.edit_reply_markup(reply_markup=None)
-    await callback.message.answer("Izoh qoldirmoqchimisiz? Yozing yoki '-' yuboring:")
-    await callback.answer()
-
-
-@router.message(StateFilter(RatingFlow.waiting_comment))
-async def handle_rating_comment(message: Message, state: FSMContext) -> None:
-    data = await state.get_data()
-    comment = (message.text or "").strip()
-
-    async with async_session_factory() as db:
-        ticket = await _get_ticket(db, data["ticket_id"])
-        if ticket is None:
-            await state.clear()
-            await message.answer("Ariza topilmadi.")
-            return
-        await record_rating(db, ticket, data["stars"], None if comment == "-" else comment)
-
-    await state.clear()
-    await message.answer("Rahmat! Bahoyingiz qabul qilindi.")
 
 
 @router.callback_query(F.data.startswith("pdf:"))

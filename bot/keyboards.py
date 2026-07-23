@@ -106,14 +106,6 @@ def suspicious_keyboard(ticket_id: int) -> InlineKeyboardMarkup:
     return builder.as_markup()
 
 
-def rating_keyboard(ticket_id: int) -> InlineKeyboardMarkup:
-    builder = InlineKeyboardBuilder()
-    for stars in range(1, 6):
-        builder.button(text="⭐" * stars, callback_data=f"rate:{ticket_id}:{stars}")
-    builder.adjust(1)
-    return builder.as_markup()
-
-
 def technician_choice_keyboard(technicians: list, ticket_id: int) -> InlineKeyboardMarkup:
     builder = InlineKeyboardBuilder()
     for tech in technicians:

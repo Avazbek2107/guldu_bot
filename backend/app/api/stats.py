@@ -9,7 +9,6 @@ from app.api.deps import require_roles
 from app.core.database import get_db
 from app.models.enums import TicketStatus, UserRole
 from app.models.faculty import Faculty
-from app.models.rating import Rating
 from app.models.ticket import Ticket
 from app.models.user import User
 from app.schemas.stats import CategoryStat, DailyCount, DashboardStats, FacultyStat, ReporterStat, TechnicianStat
@@ -137,24 +136,7 @@ async def get_dashboard_stats(db: AsyncSession = Depends(get_db)):
     category_rows = (await db.execute(select(Ticket.category, func.count()).group_by(Ticket.category))).all()
     category_stats = [CategoryStat(category=cat.value, count=count) for cat, count in category_rows]
 
-    average_rating = (await db.execute(select(func.avg(Rating.stars)))).scalar_one()
-
-    sla_breach_count = (
-        await db.execute(select(func.count()).select_from(Ticket).where(Ticket.sla_breach_notified_at.is_not(None)))
-    ).scalar_one()
-
     now = datetime.now(timezone.utc)
-    sla_open_breach_count = (
-        await db.execute(
-            select(func.count())
-            .select_from(Ticket)
-            .where(
-                Ticket.status.in_([TicketStatus.OPEN, TicketStatus.IN_PROGRESS]),
-                Ticket.sla_deadline.is_not(None),
-                Ticket.sla_deadline < now,
-            )
-        )
-    ).scalar_one()
 
     suspicious_user_count = (
         await db.execute(select(func.count()).select_from(User).where(User.is_suspicious.is_(True)))
@@ -182,9 +164,6 @@ async def get_dashboard_stats(db: AsyncSession = Depends(get_db)):
         technician_stats=technician_stats,
         reporter_stats=reporter_stats,
         category_stats=category_stats,
-        average_rating=float(average_rating) if average_rating is not None else None,
-        sla_breach_count=sla_breach_count,
-        sla_open_breach_count=sla_open_breach_count,
         suspicious_user_count=suspicious_user_count,
         blocked_user_count=blocked_user_count,
         daily_trend=daily_trend,

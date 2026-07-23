@@ -26,7 +26,3 @@ class CloseTicket(StatesGroup):
 class ReassignTicket(StatesGroup):
     waiting_target = State()
     waiting_reason = State()
-
-
-class RatingFlow(StatesGroup):
-    waiting_comment = State()

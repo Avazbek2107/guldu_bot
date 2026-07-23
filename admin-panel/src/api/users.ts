@@ -19,8 +19,12 @@ export interface UserUpdatePayload {
   telegram_id?: number | null;
 }
 
-export async function listUsers(params?: { role?: UserRole; faculty_id?: number }): Promise<UserOut[]> {
-  const { data } = await apiClient.get<UserOut[]>("/users", { params });
+export async function listUsers(params?: {
+  role?: UserRole | UserRole[];
+  faculty_id?: number;
+}): Promise<UserOut[]> {
+  const role = Array.isArray(params?.role) ? params.role.join(",") : params?.role;
+  const { data } = await apiClient.get<UserOut[]>("/users", { params: { ...params, role } });
   return data;
 }
 

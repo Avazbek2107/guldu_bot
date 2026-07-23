@@ -22,11 +22,9 @@ class TicketOut(BaseModel):
     technician_full_name: str | None
     resolution_comment: str | None
     is_suspicious: bool
-    rating_stars: int | None
     created_at: datetime
     accepted_at: datetime | None
     closed_at: datetime | None
-    sla_deadline: datetime | None
 
 
 class TicketCloseRequest(BaseModel):

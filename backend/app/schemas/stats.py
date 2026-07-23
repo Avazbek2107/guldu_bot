@@ -54,9 +54,6 @@ class DashboardStats(BaseModel):
     technician_stats: list[TechnicianStat]
     reporter_stats: list[ReporterStat]
     category_stats: list[CategoryStat]
-    average_rating: float | None
-    sla_breach_count: int
-    sla_open_breach_count: int
     suspicious_user_count: int
     blocked_user_count: int
     daily_trend: list[DailyCount]

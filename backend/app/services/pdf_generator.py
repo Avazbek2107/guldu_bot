@@ -102,7 +102,7 @@ def generate_tickets_list_pdf(tickets: Sequence[TicketOut]) -> bytes:
 
     header = [
         "Ariza №", "FISH", "Telefon", "Fakultet", "Toifa", "Muhimlik",
-        "Holat", "Texnik xodim", "Yaratilgan", "Yopilgan", "Baho",
+        "Holat", "Texnik xodim", "Yaratilgan", "Yopilgan",
     ]
     rows = [header]
     for t in tickets:
@@ -118,7 +118,6 @@ def generate_tickets_list_pdf(tickets: Sequence[TicketOut]) -> bytes:
                 Paragraph(t.technician_full_name or "-", cell_style),
                 t.created_at.strftime("%Y-%m-%d %H:%M") if t.created_at else "-",
                 t.closed_at.strftime("%Y-%m-%d %H:%M") if t.closed_at else "-",
-                "★" * t.rating_stars if t.rating_stars else "-",
             ]
         )
 

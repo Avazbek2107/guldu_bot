@@ -73,11 +73,9 @@ export interface TicketOut {
   technician_full_name: string | null;
   resolution_comment: string | null;
   is_suspicious: boolean;
-  rating_stars: number | null;
   created_at: string;
   accepted_at: string | null;
   closed_at: string | null;
-  sla_deadline: string | null;
 }
 
 export interface FacultyStat {
@@ -131,9 +129,6 @@ export interface DashboardStats {
   technician_stats: TechnicianStat[];
   reporter_stats: ReporterStat[];
   category_stats: CategoryStat[];
-  average_rating: number | null;
-  sla_breach_count: number;
-  sla_open_breach_count: number;
   suspicious_user_count: number;
   blocked_user_count: number;
   daily_trend: DailyCount[];

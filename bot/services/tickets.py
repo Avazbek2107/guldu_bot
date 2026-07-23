@@ -1,17 +1,13 @@
-from datetime import datetime, timedelta, timezone
+from datetime import datetime, timezone
 
 from sqlalchemy import func, select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models.enums import AttachmentType, TicketCategory, TicketPriority, TicketStatus, UserRole
-from app.models.rating import Rating
 from app.models.ticket import Ticket, TicketAttachment, TicketReassignment
 from app.models.user import User
 
-from bot.keyboards import accept_ticket_keyboard, rating_keyboard, ticket_actions_keyboard
-
-SLA_HOURS_URGENT = 2
-SLA_HOURS_NORMAL = 24
+from bot.keyboards import accept_ticket_keyboard, ticket_actions_keyboard
 
 
 async def create_ticket(
@@ -24,7 +20,6 @@ async def create_ticket(
     attachments: list[tuple[str, AttachmentType]] | None = None,
 ) -> Ticket:
     now = datetime.now(timezone.utc)
-    sla_hours = SLA_HOURS_URGENT if priority == TicketPriority.URGENT else SLA_HOURS_NORMAL
 
     ticket = Ticket(
         ticket_number="pending",
@@ -33,7 +28,6 @@ async def create_ticket(
         category=category,
         priority=priority,
         description=description,
-        sla_deadline=now + timedelta(hours=sla_hours),
     )
     db.add(ticket)
     await db.flush()
@@ -143,14 +137,6 @@ async def reassign_ticket(
     await db.commit()
 
 
-async def record_rating(db: AsyncSession, ticket: Ticket, stars: int, comment: str | None) -> Rating:
-    rating = Rating(ticket_id=ticket.id, stars=stars, comment=comment)
-    db.add(rating)
-    await db.commit()
-    await db.refresh(rating)
-    return rating
-
-
 CATEGORY_LABELS_UZ = {
     "computer": "Kompyuter",
     "network": "Tarmoq/internet",
@@ -195,18 +181,6 @@ async def notify_backup_technicians(bot, db: AsyncSession, ticket: Ticket) -> No
             await bot.send_message(tech.telegram_id, text, reply_markup=accept_ticket_keyboard(ticket.id))
 
 
-async def notify_sla_breach(bot, db: AsyncSession, ticket: Ticket) -> None:
-    result = await db.execute(
-        select(User).where(User.role == UserRole.SUPER_ADMIN, User.telegram_id.is_not(None))
-    )
-    text = (
-        f"🚨 SLA MUDDATI O'TDI!\n\nAriza: {ticket.ticket_number}\n"
-        f"Fakultet ID: {ticket.faculty_id}\nHolat: {ticket.status.value}"
-    )
-    for admin in result.scalars().all():
-        await bot.send_message(admin.telegram_id, text)
-
-
 async def notify_reassignment(bot, db: AsyncSession, ticket: Ticket, to_technician: User, reason: str) -> None:
     if not to_technician.telegram_id:
         return
@@ -227,10 +201,9 @@ async def notify_ticket_accepted(bot, ticket: Ticket, creator: User) -> None:
         )
 
 
-async def notify_ticket_closed_request_rating(bot, ticket: Ticket, creator: User) -> None:
+async def notify_ticket_closed(bot, ticket: Ticket, creator: User) -> None:
     if creator.telegram_id:
         await bot.send_message(
             creator.telegram_id,
-            f"✅ Arizangiz (#{ticket.ticket_number}) yopildi. Iltimos, xizmatni baholang:",
-            reply_markup=rating_keyboard(ticket.id),
+            f"✅ Arizangiz (#{ticket.ticket_number}) yopildi.",
         )

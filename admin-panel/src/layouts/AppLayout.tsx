@@ -3,6 +3,7 @@ import {
   DashboardOutlined,
   UnorderedListOutlined,
   TeamOutlined,
+  UserOutlined,
   BankOutlined,
   LogoutOutlined,
 } from "@ant-design/icons";
@@ -22,7 +23,8 @@ export function AppLayout() {
   const menuItems = [
     isSuperAdmin ? { key: "/dashboard", icon: <DashboardOutlined />, label: "Dashboard" } : null,
     { key: "/tickets", icon: <UnorderedListOutlined />, label: "Arizalar" },
-    isSuperAdmin ? { key: "/users", icon: <TeamOutlined />, label: "Foydalanuvchilar" } : null,
+    isSuperAdmin ? { key: "/users", icon: <TeamOutlined />, label: "Xodimlar" } : null,
+    isSuperAdmin ? { key: "/end-users", icon: <UserOutlined />, label: "Foydalanuvchilar" } : null,
     isSuperAdmin ? { key: "/faculties", icon: <BankOutlined />, label: "Fakultetlar" } : null,
   ].filter((item): item is NonNullable<typeof item> => item !== null);
 

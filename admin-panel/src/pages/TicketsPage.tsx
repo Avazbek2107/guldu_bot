@@ -212,11 +212,6 @@ export function TicketsPage() {
             render: (v: string) => new Date(v).toLocaleString("uz-UZ"),
           },
           {
-            title: "Baho",
-            dataIndex: "rating_stars",
-            render: (v: number | null) => (v != null ? "⭐".repeat(v) : "-"),
-          },
-          {
             title: "Amallar",
             key: "actions",
             render: (_: unknown, record: TicketOut) => (

@@ -10,7 +10,6 @@ from app.api.deps import get_current_user
 from app.core.database import get_db
 from app.models.enums import TicketCategory, TicketPriority, TicketStatus, UserRole
 from app.models.faculty import Faculty
-from app.models.rating import Rating
 from app.models.ticket import Ticket, TicketReassignment
 from app.models.user import User
 from app.schemas.ticket import TicketCloseRequest, TicketOut, TicketReassignRequest
@@ -30,7 +29,7 @@ def _can_access_ticket_faculty(current_user: User, faculty_id: int) -> bool:
 
 
 def _row_to_ticket_out(row) -> TicketOut:
-    ticket, faculty_name, creator_full_name, creator_phone, technician_full_name, rating_stars = row
+    ticket, faculty_name, creator_full_name, creator_phone, technician_full_name = row
     return TicketOut(
         id=ticket.id,
         ticket_number=ticket.ticket_number,
@@ -46,11 +45,9 @@ def _row_to_ticket_out(row) -> TicketOut:
         technician_full_name=technician_full_name,
         resolution_comment=ticket.resolution_comment,
         is_suspicious=ticket.is_suspicious,
-        rating_stars=rating_stars,
         created_at=ticket.created_at,
         accepted_at=ticket.accepted_at,
         closed_at=ticket.closed_at,
-        sla_deadline=ticket.sla_deadline,
     )
 
 
@@ -70,11 +67,10 @@ async def list_tickets(
     technician_alias = aliased(User)
 
     query = (
-        select(Ticket, Faculty.name, creator_alias.full_name, creator_alias.phone, technician_alias.full_name, Rating.stars)
+        select(Ticket, Faculty.name, creator_alias.full_name, creator_alias.phone, technician_alias.full_name)
         .join(Faculty, Ticket.faculty_id == Faculty.id)
         .join(creator_alias, Ticket.created_by_user_id == creator_alias.id)
         .outerjoin(technician_alias, Ticket.assigned_technician_id == technician_alias.id)
-        .outerjoin(Rating, Rating.ticket_id == Ticket.id)
     )
 
     if current_user.role == UserRole.SUPER_ADMIN:
@@ -154,11 +150,10 @@ async def get_ticket(
     technician_alias = aliased(User)
 
     query = (
-        select(Ticket, Faculty.name, creator_alias.full_name, creator_alias.phone, technician_alias.full_name, Rating.stars)
+        select(Ticket, Faculty.name, creator_alias.full_name, creator_alias.phone, technician_alias.full_name)
         .join(Faculty, Ticket.faculty_id == Faculty.id)
         .join(creator_alias, Ticket.created_by_user_id == creator_alias.id)
         .outerjoin(technician_alias, Ticket.assigned_technician_id == technician_alias.id)
-        .outerjoin(Rating, Rating.ticket_id == Ticket.id)
         .where(Ticket.id == ticket_id)
     )
     result = await db.execute(query)

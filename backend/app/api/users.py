@@ -15,7 +15,7 @@ router = APIRouter(prefix="/users", tags=["users"])
 
 @router.get("", response_model=list[UserOut])
 async def list_users(
-    role: UserRole | None = None,
+    role: str | None = None,
     faculty_id: int | None = None,
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user),
@@ -23,8 +23,12 @@ async def list_users(
     query = select(User)
 
     if current_user.role == UserRole.SUPER_ADMIN:
-        if role is not None:
-            query = query.where(User.role == role)
+        if role:
+            try:
+                roles = [UserRole(r) for r in role.split(",")]
+            except ValueError as exc:
+                raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Noto'g'ri rol qiymati") from exc
+            query = query.where(User.role.in_(roles))
         if faculty_id is not None:
             query = query.where(User.faculty_id == faculty_id)
     elif current_user.role in (UserRole.TECHNICIAN_MAIN, UserRole.TECHNICIAN_BACKUP):

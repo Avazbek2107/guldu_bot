@@ -21,9 +21,9 @@ STATUS_LABELS_UZ = {"open": "Ochiq", "in_progress": "Jarayonda", "closed": "Yopi
 
 HEADERS = [
     "Ariza №", "FISH", "Telefon", "Fakultet", "Toifa", "Muhimlik", "Tavsif",
-    "Holat", "Texnik xodim", "Yaratilgan sana", "Yopilgan sana", "Yechim izohi", "Baho",
+    "Holat", "Texnik xodim", "Yaratilgan sana", "Yopilgan sana", "Yechim izohi",
 ]
-COLUMN_WIDTHS = [14, 22, 16, 22, 16, 12, 40, 12, 22, 18, 18, 40, 8]
+COLUMN_WIDTHS = [14, 22, 16, 22, 16, 12, 40, 12, 22, 18, 18, 40]
 
 
 def generate_tickets_xlsx(tickets: Sequence[TicketOut]) -> bytes:
@@ -50,7 +50,6 @@ def generate_tickets_xlsx(tickets: Sequence[TicketOut]) -> bytes:
                 t.created_at.strftime("%Y-%m-%d %H:%M") if t.created_at else "-",
                 t.closed_at.strftime("%Y-%m-%d %H:%M") if t.closed_at else "-",
                 t.resolution_comment or "-",
-                t.rating_stars or "-",
             ]
         )
 
