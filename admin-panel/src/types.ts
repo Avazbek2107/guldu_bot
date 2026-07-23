@@ -89,6 +89,18 @@ export interface FacultyStat {
   closed: number;
 }
 
+export interface ReporterStat {
+  user_id: number;
+  full_name: string;
+  phone: string;
+  faculty_id: number | null;
+  faculty_name: string | null;
+  total_tickets: number;
+  open_tickets: number;
+  suspicious_tickets: number;
+  last_ticket_at: string | null;
+}
+
 export interface TechnicianStat {
   technician_id: number;
   full_name: string;
@@ -117,6 +129,7 @@ export interface DashboardStats {
   closed_tickets: number;
   faculty_stats: FacultyStat[];
   technician_stats: TechnicianStat[];
+  reporter_stats: ReporterStat[];
   category_stats: CategoryStat[];
   average_rating: number | null;
   sla_breach_count: number;

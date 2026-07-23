@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { Card, Col, Row, Statistic, Spin, Table, Tooltip as AntTooltip } from "antd";
+import { Card, Col, Row, Statistic, Spin, Table, Tag, Tooltip as AntTooltip } from "antd";
 import { InfoCircleOutlined } from "@ant-design/icons";
 import {
   Bar,
@@ -190,6 +190,42 @@ export function DashboardPage() {
                   title: "O'rt. yopish vaqti",
                   dataIndex: "avg_close_hours",
                   render: (value: number | null) => (value != null ? `${value.toFixed(1)} soat` : "-"),
+                },
+              ]}
+            />
+          </Card>
+        </Col>
+      </Row>
+
+      <Row gutter={16} style={{ marginTop: 16 }}>
+        <Col span={24}>
+          <Card title="Eng ko'p ariza yozgan foydalanuvchilar (kimda doim muammo bor)">
+            <Table
+              size="small"
+              rowKey="user_id"
+              pagination={false}
+              dataSource={stats.reporter_stats}
+              columns={[
+                { title: "FISH", dataIndex: "full_name" },
+                { title: "Telefon", dataIndex: "phone" },
+                { title: "Fakultet", dataIndex: "faculty_name", render: (v: string | null) => v ?? "-" },
+                {
+                  title: "Jami ariza",
+                  dataIndex: "total_tickets",
+                  defaultSortOrder: "descend",
+                  sorter: (a: { total_tickets: number }, b: { total_tickets: number }) =>
+                    a.total_tickets - b.total_tickets,
+                },
+                { title: "Ochiq", dataIndex: "open_tickets" },
+                {
+                  title: "Shubhali",
+                  dataIndex: "suspicious_tickets",
+                  render: (v: number) => (v > 0 ? <Tag color="orange">{v}</Tag> : v),
+                },
+                {
+                  title: "Oxirgi ariza",
+                  dataIndex: "last_ticket_at",
+                  render: (v: string | null) => (v ? new Date(v).toLocaleDateString("uz-UZ") : "-"),
                 },
               ]}
             />

@@ -2,7 +2,7 @@ from collections import Counter, defaultdict
 from datetime import datetime, timedelta, timezone
 
 from fastapi import APIRouter, Depends
-from sqlalchemy import func, select
+from sqlalchemy import case, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.api.deps import require_roles
@@ -12,11 +12,12 @@ from app.models.faculty import Faculty
 from app.models.rating import Rating
 from app.models.ticket import Ticket
 from app.models.user import User
-from app.schemas.stats import CategoryStat, DailyCount, DashboardStats, FacultyStat, TechnicianStat
+from app.schemas.stats import CategoryStat, DailyCount, DashboardStats, FacultyStat, ReporterStat, TechnicianStat
 
 router = APIRouter(prefix="/stats", tags=["stats"])
 
 TREND_DAYS = 30
+TOP_REPORTERS_LIMIT = 15
 
 
 @router.get("/dashboard", response_model=DashboardStats, dependencies=[Depends(require_roles(UserRole.SUPER_ADMIN))])
@@ -90,6 +91,49 @@ async def get_dashboard_stats(db: AsyncSession = Depends(get_db)):
             )
         )
 
+    reporter_rows = (
+        await db.execute(
+            select(
+                Ticket.created_by_user_id,
+                func.count().label("total"),
+                func.sum(case((Ticket.status != TicketStatus.CLOSED, 1), else_=0)).label("open_count"),
+                func.sum(case((Ticket.is_suspicious.is_(True), 1), else_=0)).label("suspicious_count"),
+                func.max(Ticket.created_at).label("last_at"),
+            )
+            .group_by(Ticket.created_by_user_id)
+            .order_by(func.count().desc())
+            .limit(TOP_REPORTERS_LIMIT)
+        )
+    ).all()
+
+    reporter_user_ids = [row.created_by_user_id for row in reporter_rows]
+    reporter_users: dict[int, User] = {}
+    if reporter_user_ids:
+        reporter_users = {
+            u.id: u
+            for u in (await db.execute(select(User).where(User.id.in_(reporter_user_ids)))).scalars().all()
+        }
+    faculty_names = {f.id: f.name for f in faculties}
+
+    reporter_stats = []
+    for row in reporter_rows:
+        user = reporter_users.get(row.created_by_user_id)
+        if user is None:
+            continue
+        reporter_stats.append(
+            ReporterStat(
+                user_id=user.id,
+                full_name=user.full_name,
+                phone=user.phone,
+                faculty_id=user.faculty_id,
+                faculty_name=faculty_names.get(user.faculty_id) if user.faculty_id is not None else None,
+                total_tickets=row.total,
+                open_tickets=row.open_count,
+                suspicious_tickets=row.suspicious_count,
+                last_ticket_at=row.last_at,
+            )
+        )
+
     category_rows = (await db.execute(select(Ticket.category, func.count()).group_by(Ticket.category))).all()
     category_stats = [CategoryStat(category=cat.value, count=count) for cat, count in category_rows]
 
@@ -136,6 +180,7 @@ async def get_dashboard_stats(db: AsyncSession = Depends(get_db)):
         closed_tickets=closed_tickets,
         faculty_stats=faculty_stats,
         technician_stats=technician_stats,
+        reporter_stats=reporter_stats,
         category_stats=category_stats,
         average_rating=float(average_rating) if average_rating is not None else None,
         sla_breach_count=sla_breach_count,

@@ -1,4 +1,18 @@
+from datetime import datetime
+
 from pydantic import BaseModel
+
+
+class ReporterStat(BaseModel):
+    user_id: int
+    full_name: str
+    phone: str
+    faculty_id: int | None
+    faculty_name: str | None
+    total_tickets: int
+    open_tickets: int
+    suspicious_tickets: int
+    last_ticket_at: datetime | None
 
 
 class FacultyStat(BaseModel):
@@ -38,6 +52,7 @@ class DashboardStats(BaseModel):
     closed_tickets: int
     faculty_stats: list[FacultyStat]
     technician_stats: list[TechnicianStat]
+    reporter_stats: list[ReporterStat]
     category_stats: list[CategoryStat]
     average_rating: float | None
     sla_breach_count: int
