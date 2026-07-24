@@ -1,10 +1,11 @@
-from typing import Literal
-
 from pydantic import BaseModel, ConfigDict
+
+from app.models.enums import OrgUnitType
 
 
 class FacultyCreate(BaseModel):
     name: str
+    unit_type: OrgUnitType = OrgUnitType.FACULTY
 
 
 class FacultyUpdate(BaseModel):
@@ -16,8 +17,4 @@ class FacultyOut(BaseModel):
 
     id: int
     name: str
-
-
-class AssignTechnicianRequest(BaseModel):
-    user_id: int
-    role: Literal["technician_main", "technician_backup"]
+    unit_type: OrgUnitType

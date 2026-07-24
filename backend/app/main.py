@@ -1,11 +1,14 @@
-from fastapi import Depends, FastAPI
+from fastapi import Depends, FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import JSONResponse
+from jwt import PyJWTError
 from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.api import auth, faculties, stats, tickets, users
+from app.api import auth, faculties, inventory, stats, tickets, users
 from app.core.config import settings
 from app.core.database import get_db
+from app.core.security import decode_access_token
 
 app = FastAPI(title="Technician Support Bot API")
 
@@ -17,11 +20,39 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+CSRF_PROTECTED_METHODS = {"POST", "PUT", "PATCH", "DELETE"}
+
+
+@app.middleware("http")
+async def csrf_protection(request: Request, call_next):
+    if request.method in CSRF_PROTECTED_METHODS and request.url.path != "/auth/login":
+        cookie_token = request.cookies.get(auth.COOKIE_NAME)
+        if cookie_token is not None:
+            try:
+                payload = decode_access_token(cookie_token)
+            except PyJWTError:
+                payload = None
+            header_csrf = request.headers.get("x-csrf-token")
+            if payload is None or not header_csrf or header_csrf != payload.get("csrf"):
+                return JSONResponse(status_code=403, content={"detail": "CSRF token noto'g'ri yoki yo'q"})
+    return await call_next(request)
+
+
+@app.middleware("http")
+async def security_headers(request: Request, call_next):
+    response = await call_next(request)
+    response.headers["X-Content-Type-Options"] = "nosniff"
+    response.headers["X-Frame-Options"] = "DENY"
+    response.headers["Referrer-Policy"] = "strict-origin-when-cross-origin"
+    return response
+
+
 app.include_router(auth.router)
 app.include_router(faculties.router)
 app.include_router(users.router)
 app.include_router(tickets.router)
 app.include_router(stats.router)
+app.include_router(inventory.router)
 
 
 @app.get("/health")

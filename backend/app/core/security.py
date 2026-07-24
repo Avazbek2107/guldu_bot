@@ -1,4 +1,6 @@
+import secrets
 from datetime import datetime, timedelta, timezone
+from typing import NamedTuple
 
 import bcrypt
 import jwt
@@ -14,10 +16,17 @@ def verify_password(plain: str, hashed: str) -> bool:
     return bcrypt.checkpw(plain.encode("utf-8"), hashed.encode("utf-8"))
 
 
-def create_access_token(user_id: int, role: str) -> str:
+class IssuedToken(NamedTuple):
+    token: str
+    csrf_token: str
+
+
+def create_access_token(user_id: int, role: str) -> IssuedToken:
     expire = datetime.now(timezone.utc) + timedelta(minutes=settings.jwt_expire_minutes)
-    payload = {"sub": str(user_id), "role": role, "exp": expire}
-    return jwt.encode(payload, settings.jwt_secret_key, algorithm=settings.jwt_algorithm)
+    csrf_token = secrets.token_urlsafe(32)
+    payload = {"sub": str(user_id), "role": role, "csrf": csrf_token, "exp": expire}
+    token = jwt.encode(payload, settings.jwt_secret_key, algorithm=settings.jwt_algorithm)
+    return IssuedToken(token=token, csrf_token=csrf_token)
 
 
 def decode_access_token(token: str) -> dict:

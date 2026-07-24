@@ -3,7 +3,8 @@ from datetime import datetime, timezone
 from sqlalchemy import func, select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.models.enums import AttachmentType, TicketCategory, TicketPriority, TicketStatus, UserRole
+from app.models.enums import AttachmentType, TechnicianFacultyRole, TicketCategory, TicketPriority, TicketStatus, UserRole
+from app.models.technician_faculty_assignment import TechnicianFacultyAssignment
 from app.models.ticket import Ticket, TicketAttachment, TicketReassignment
 from app.models.user import User
 
@@ -54,13 +55,25 @@ async def count_open_tickets_for_faculty(db: AsyncSession, faculty_id: int) -> i
 
 
 async def get_faculty_technician_main(db: AsyncSession, faculty_id: int) -> User | None:
-    result = await db.execute(select(User).where(User.faculty_id == faculty_id, User.role == UserRole.TECHNICIAN_MAIN))
+    result = await db.execute(
+        select(User)
+        .join(TechnicianFacultyAssignment, TechnicianFacultyAssignment.user_id == User.id)
+        .where(
+            TechnicianFacultyAssignment.faculty_id == faculty_id,
+            TechnicianFacultyAssignment.role == TechnicianFacultyRole.TECHNICIAN_MAIN,
+        )
+    )
     return result.scalar_one_or_none()
 
 
 async def get_faculty_technicians_backup(db: AsyncSession, faculty_id: int) -> list[User]:
     result = await db.execute(
-        select(User).where(User.faculty_id == faculty_id, User.role == UserRole.TECHNICIAN_BACKUP)
+        select(User)
+        .join(TechnicianFacultyAssignment, TechnicianFacultyAssignment.user_id == User.id)
+        .where(
+            TechnicianFacultyAssignment.faculty_id == faculty_id,
+            TechnicianFacultyAssignment.role == TechnicianFacultyRole.TECHNICIAN_BACKUP,
+        )
     )
     return list(result.scalars().all())
 
@@ -68,8 +81,8 @@ async def get_faculty_technicians_backup(db: AsyncSession, faculty_id: int) -> l
 async def get_faculty_technicians(
     db: AsyncSession, faculty_id: int, exclude_user_id: int | None = None
 ) -> list[User]:
-    query = select(User).where(
-        User.faculty_id == faculty_id,
+    query = select(User).join(TechnicianFacultyAssignment, TechnicianFacultyAssignment.user_id == User.id).where(
+        TechnicianFacultyAssignment.faculty_id == faculty_id,
         User.role.in_([UserRole.TECHNICIAN_MAIN, UserRole.TECHNICIAN_BACKUP]),
     )
     if exclude_user_id is not None:
@@ -78,10 +91,22 @@ async def get_faculty_technicians(
     return list(result.scalars().all())
 
 
-def can_close_ticket(ticket: Ticket, user: User) -> bool:
+async def is_technician_assigned(db: AsyncSession, user_id: int, faculty_id: int) -> bool:
+    result = await db.execute(
+        select(TechnicianFacultyAssignment.id).where(
+            TechnicianFacultyAssignment.user_id == user_id,
+            TechnicianFacultyAssignment.faculty_id == faculty_id,
+        )
+    )
+    return result.scalar_one_or_none() is not None
+
+
+async def can_close_ticket(db: AsyncSession, ticket: Ticket, user: User) -> bool:
     if user.id == ticket.created_by_user_id:
         return True
-    if user.role in (UserRole.TECHNICIAN_MAIN, UserRole.TECHNICIAN_BACKUP) and user.faculty_id == ticket.faculty_id:
+    if user.role in (UserRole.TECHNICIAN_MAIN, UserRole.TECHNICIAN_BACKUP) and await is_technician_assigned(
+        db, user.id, ticket.faculty_id
+    ):
         return True
     return user.role == UserRole.SUPER_ADMIN
 
@@ -110,12 +135,14 @@ async def close_ticket(
     resolution_comment: str | None,
     is_suspicious: bool,
     suspicious_comment: str | None,
+    inventory_item_id: int,
 ) -> None:
     ticket.status = TicketStatus.CLOSED
     ticket.closed_at = datetime.now(timezone.utc)
     ticket.resolution_comment = resolution_comment
     ticket.is_suspicious = is_suspicious
     ticket.suspicious_comment = suspicious_comment
+    ticket.inventory_item_id = inventory_item_id
     if is_suspicious:
         creator = await db.get(User, ticket.created_by_user_id)
         creator.is_suspicious = True

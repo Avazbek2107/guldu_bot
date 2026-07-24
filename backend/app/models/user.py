@@ -1,4 +1,6 @@
-from sqlalchemy import BigInteger, Boolean, ForeignKey, Index, String
+from datetime import datetime
+
+from sqlalchemy import BigInteger, Boolean, DateTime, ForeignKey, Integer, String
 from sqlalchemy import Enum as SAEnum
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
@@ -8,14 +10,6 @@ from app.models.enums import UserRole
 
 class User(Base, TimestampMixin):
     __tablename__ = "users"
-    __table_args__ = (
-        Index(
-            "ix_one_main_technician_per_faculty",
-            "faculty_id",
-            unique=True,
-            postgresql_where="role = 'technician_main'",
-        ),
-    )
 
     id: Mapped[int] = mapped_column(primary_key=True)
 
@@ -35,7 +29,13 @@ class User(Base, TimestampMixin):
     is_blocked: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
     is_suspicious: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
 
+    failed_login_attempts: Mapped[int] = mapped_column(Integer, default=0, server_default="0", nullable=False)
+    locked_until: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+
     faculty: Mapped["Faculty"] = relationship(back_populates="users")
+    faculty_assignments: Mapped[list["TechnicianFacultyAssignment"]] = relationship(
+        back_populates="user", cascade="all, delete-orphan"
+    )
     tickets_created: Mapped[list["Ticket"]] = relationship(
         back_populates="created_by", foreign_keys="Ticket.created_by_user_id"
     )

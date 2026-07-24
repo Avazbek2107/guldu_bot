@@ -1,13 +1,15 @@
 import { useEffect, useState } from "react";
 import { Card, Col, Row, Statistic, Spin, Table, Tag } from "antd";
+import { StopOutlined, WarningOutlined } from "@ant-design/icons";
 import {
+  Area,
+  AreaChart,
   Bar,
   BarChart,
   CartesianGrid,
   Cell,
   Legend,
-  Line,
-  LineChart,
+  LabelList,
   Pie,
   PieChart,
   ResponsiveContainer,
@@ -19,7 +21,75 @@ import { fetchDashboardStats } from "../api/stats";
 import type { DashboardStats } from "../types";
 import { CATEGORY_LABELS_UZ } from "../types";
 
-const STATUS_COLORS = ["#faad14", "#1677ff", "#52c41a"];
+// Validated categorical slots (dataviz skill palette) — fixed order, never cycled.
+const BLUE = "#2a78d6"; // categorical slot 1 — "Jarayonda"
+const ORANGE = "#eb6834"; // categorical slot 2 — "Ochiq"
+const GREEN = "#008300"; // categorical slot 6 — "Yopilgan"
+
+const STATUS_WARNING = "#fab219";
+const STATUS_CRITICAL = "#d03b3b";
+
+const INK_PRIMARY = "#0b0b0b";
+const INK_SECONDARY = "#52514e";
+const INK_MUTED = "#898781";
+const GRIDLINE = "#e1e0d9";
+const SURFACE = "#fcfcfb";
+
+const STATUS_COLORS: Record<string, string> = {
+  Ochiq: ORANGE,
+  Jarayonda: BLUE,
+  Yopilgan: GREEN,
+};
+
+interface TooltipPayloadItem {
+  name?: string;
+  value?: number | string;
+  color?: string;
+  fill?: string;
+  payload?: Record<string, unknown>;
+}
+
+function ChartTooltip({
+  active,
+  payload,
+  label,
+}: {
+  active?: boolean;
+  payload?: TooltipPayloadItem[];
+  label?: string;
+}) {
+  if (!active || !payload?.length) return null;
+  return (
+    <div
+      style={{
+        background: SURFACE,
+        border: "1px solid rgba(11,11,11,0.10)",
+        borderRadius: 8,
+        padding: "8px 12px",
+        boxShadow: "0 4px 16px rgba(11,11,11,0.10)",
+        fontSize: 13,
+        minWidth: 120,
+      }}
+    >
+      {label && <div style={{ color: INK_SECONDARY, marginBottom: 4 }}>{label}</div>}
+      {payload.map((p, i) => (
+        <div key={i} style={{ display: "flex", alignItems: "center", gap: 6 }}>
+          <span
+            style={{
+              width: 8,
+              height: 8,
+              borderRadius: 2,
+              background: p.color ?? p.fill,
+              flexShrink: 0,
+            }}
+          />
+          <span style={{ color: INK_SECONDARY }}>{p.name}:</span>
+          <strong style={{ color: INK_PRIMARY }}>{p.value}</strong>
+        </div>
+      ))}
+    </div>
+  );
+}
 
 export function DashboardPage() {
   const [stats, setStats] = useState<DashboardStats | null>(null);
@@ -39,93 +109,161 @@ export function DashboardPage() {
     );
   }
 
-  const statusPieData = [
+  const statusData = [
     { name: "Ochiq", value: stats.open_tickets },
     { name: "Jarayonda", value: stats.in_progress_tickets },
     { name: "Yopilgan", value: stats.closed_tickets },
   ];
 
-  const categoryBarData = stats.category_stats.map((c) => ({
-    name: CATEGORY_LABELS_UZ[c.category as keyof typeof CATEGORY_LABELS_UZ] ?? c.category,
-    count: c.count,
-  }));
+  const categoryData = stats.category_stats
+    .map((c) => ({
+      name: CATEGORY_LABELS_UZ[c.category as keyof typeof CATEGORY_LABELS_UZ] ?? c.category,
+      count: c.count,
+    }))
+    .sort((a, b) => b.count - a.count);
 
   return (
     <div>
       <Row gutter={[16, 16]}>
-        <Col span={6}>
+        <Col xs={12} sm={12} md={6}>
           <Card>
-            <Statistic title="Jami arizalar" value={stats.total_tickets} />
+            <Statistic title="Jami arizalar" value={stats.total_tickets} valueStyle={{ color: INK_PRIMARY }} />
           </Card>
         </Col>
-        <Col span={6}>
+        <Col xs={12} sm={12} md={6}>
           <Card>
-            <Statistic title="Ochiq" value={stats.open_tickets} valueStyle={{ color: "#faad14" }} />
+            <Statistic title="Ochiq" value={stats.open_tickets} valueStyle={{ color: ORANGE }} />
           </Card>
         </Col>
-        <Col span={6}>
+        <Col xs={12} sm={12} md={6}>
           <Card>
-            <Statistic title="Jarayonda" value={stats.in_progress_tickets} valueStyle={{ color: "#1677ff" }} />
+            <Statistic title="Jarayonda" value={stats.in_progress_tickets} valueStyle={{ color: BLUE }} />
           </Card>
         </Col>
-        <Col span={6}>
+        <Col xs={12} sm={12} md={6}>
           <Card>
-            <Statistic title="Yopilgan" value={stats.closed_tickets} valueStyle={{ color: "#52c41a" }} />
+            <Statistic title="Yopilgan" value={stats.closed_tickets} valueStyle={{ color: GREEN }} />
           </Card>
         </Col>
       </Row>
 
-      <Row gutter={16} style={{ marginTop: 16 }}>
-        <Col span={8}>
+      <Row gutter={[16, 16]} style={{ marginTop: 16 }}>
+        <Col xs={24} md={12} lg={8}>
           <Card title="Holat bo'yicha taqsimot">
-            <ResponsiveContainer width="100%" height={260}>
-              <PieChart>
-                <Pie data={statusPieData} dataKey="value" nameKey="name" outerRadius={80}>
-                  {statusPieData.map((_, index) => (
-                    <Cell key={index} fill={STATUS_COLORS[index % STATUS_COLORS.length]} />
-                  ))}
-                </Pie>
-                <Tooltip />
-                <Legend verticalAlign="bottom" height={36} />
-              </PieChart>
-            </ResponsiveContainer>
+            <div style={{ position: "relative" }}>
+              <ResponsiveContainer width="100%" height={260}>
+                <PieChart>
+                  <Pie
+                    data={statusData}
+                    dataKey="value"
+                    nameKey="name"
+                    innerRadius={64}
+                    outerRadius={90}
+                    paddingAngle={2}
+                    cornerRadius={4}
+                    stroke={SURFACE}
+                    strokeWidth={2}
+                  >
+                    {statusData.map((entry) => (
+                      <Cell key={entry.name} fill={STATUS_COLORS[entry.name]} />
+                    ))}
+                  </Pie>
+                  <Tooltip content={<ChartTooltip />} />
+                  <Legend
+                    verticalAlign="bottom"
+                    height={36}
+                    iconType="circle"
+                    iconSize={8}
+                    formatter={(value) => <span style={{ color: INK_SECONDARY }}>{value}</span>}
+                  />
+                </PieChart>
+              </ResponsiveContainer>
+              <div
+                style={{
+                  position: "absolute",
+                  top: "42%",
+                  left: "50%",
+                  transform: "translate(-50%, -50%)",
+                  textAlign: "center",
+                  pointerEvents: "none",
+                }}
+              >
+                <div style={{ fontSize: 24, fontWeight: 600, color: INK_PRIMARY, lineHeight: 1.1 }}>
+                  {stats.total_tickets}
+                </div>
+                <div style={{ fontSize: 12, color: INK_MUTED }}>jami</div>
+              </div>
+            </div>
           </Card>
         </Col>
-        <Col span={8}>
+        <Col xs={24} md={12} lg={8}>
           <Card title="Muammo toifalari">
             <ResponsiveContainer width="100%" height={260}>
-              <BarChart data={categoryBarData}>
-                <CartesianGrid strokeDasharray="3 3" />
-                <XAxis dataKey="name" tick={{ fontSize: 11 }} interval={0} angle={-20} textAnchor="end" height={60} />
-                <YAxis allowDecimals={false} />
-                <Tooltip />
-                <Bar dataKey="count" fill="#1677ff" />
+              <BarChart data={categoryData} layout="vertical" margin={{ left: 8, right: 24 }}>
+                <CartesianGrid horizontal={false} stroke={GRIDLINE} />
+                <XAxis type="number" allowDecimals={false} tick={{ fontSize: 11, fill: INK_MUTED }} axisLine={{ stroke: GRIDLINE }} tickLine={false} />
+                <YAxis
+                  type="category"
+                  dataKey="name"
+                  width={110}
+                  tick={{ fontSize: 11, fill: INK_SECONDARY }}
+                  axisLine={{ stroke: GRIDLINE }}
+                  tickLine={false}
+                />
+                <Tooltip content={<ChartTooltip />} cursor={{ fill: "rgba(42,120,214,0.06)" }} />
+                <Bar dataKey="count" fill={BLUE} radius={[0, 4, 4, 0]} maxBarSize={20} name="Arizalar">
+                  <LabelList dataKey="count" position="right" style={{ fill: INK_SECONDARY, fontSize: 11 }} />
+                </Bar>
               </BarChart>
             </ResponsiveContainer>
           </Card>
         </Col>
-        <Col span={8}>
+        <Col xs={24} lg={8}>
           <Card title="Vaqt bo'yicha trend (30 kun)">
             <ResponsiveContainer width="100%" height={260}>
-              <LineChart data={stats.daily_trend}>
-                <CartesianGrid strokeDasharray="3 3" />
-                <XAxis dataKey="date" tick={{ fontSize: 9 }} interval={4} />
-                <YAxis allowDecimals={false} />
-                <Tooltip />
-                <Line type="monotone" dataKey="count" stroke="#52c41a" dot={false} />
-              </LineChart>
+              <AreaChart data={stats.daily_trend} margin={{ left: -12, right: 12 }}>
+                <defs>
+                  <linearGradient id="trendFill" x1="0" y1="0" x2="0" y2="1">
+                    <stop offset="0%" stopColor={BLUE} stopOpacity={0.28} />
+                    <stop offset="100%" stopColor={BLUE} stopOpacity={0.02} />
+                  </linearGradient>
+                </defs>
+                <CartesianGrid vertical={false} stroke={GRIDLINE} />
+                <XAxis
+                  dataKey="date"
+                  tick={{ fontSize: 10, fill: INK_MUTED }}
+                  tickFormatter={(value: string) => value.slice(5)}
+                  interval={Math.max(0, Math.ceil(stats.daily_trend.length / 6) - 1)}
+                  axisLine={{ stroke: GRIDLINE }}
+                  tickLine={false}
+                  minTickGap={16}
+                />
+                <YAxis allowDecimals={false} tick={{ fontSize: 11, fill: INK_MUTED }} axisLine={false} tickLine={false} />
+                <Tooltip content={<ChartTooltip />} />
+                <Area
+                  type="monotone"
+                  dataKey="count"
+                  name="Arizalar"
+                  stroke={BLUE}
+                  strokeWidth={2}
+                  fill="url(#trendFill)"
+                  dot={false}
+                  activeDot={{ r: 4, stroke: SURFACE, strokeWidth: 2 }}
+                />
+              </AreaChart>
             </ResponsiveContainer>
           </Card>
         </Col>
       </Row>
 
-      <Row gutter={16} style={{ marginTop: 16 }}>
-        <Col span={12}>
+      <Row gutter={[16, 16]} style={{ marginTop: 16 }}>
+        <Col xs={24} lg={12}>
           <Card title="Fakultetlar kesimida statistika">
             <Table
               size="small"
               rowKey="faculty_id"
               pagination={false}
+              scroll={{ x: "max-content" }}
               dataSource={stats.faculty_stats}
               columns={[
                 { title: "Fakultet", dataIndex: "faculty_name" },
@@ -137,12 +275,13 @@ export function DashboardPage() {
             />
           </Card>
         </Col>
-        <Col span={12}>
+        <Col xs={24} lg={12}>
           <Card title="Xodimlar ish samaradorligi">
             <Table
               size="small"
               rowKey="technician_id"
               pagination={false}
+              scroll={{ x: "max-content" }}
               dataSource={stats.technician_stats}
               columns={[
                 { title: "FISH", dataIndex: "full_name" },
@@ -165,13 +304,14 @@ export function DashboardPage() {
         </Col>
       </Row>
 
-      <Row gutter={16} style={{ marginTop: 16 }}>
+      <Row gutter={[16, 16]} style={{ marginTop: 16 }}>
         <Col span={24}>
           <Card title="Eng ko'p ariza yozgan foydalanuvchilar (kimda doim muammo bor)">
             <Table
               size="small"
               rowKey="user_id"
               pagination={false}
+              scroll={{ x: "max-content" }}
               dataSource={stats.reporter_stats}
               columns={[
                 { title: "FISH", dataIndex: "full_name" },
@@ -201,15 +341,33 @@ export function DashboardPage() {
         </Col>
       </Row>
 
-      <Row gutter={16} style={{ marginTop: 16 }}>
-        <Col span={12}>
+      <Row gutter={[16, 16]} style={{ marginTop: 16 }}>
+        <Col xs={24} sm={12}>
           <Card>
-            <Statistic title="Shubhali foydalanuvchilar" value={stats.suspicious_user_count} valueStyle={{ color: "#faad14" }} />
+            <Statistic
+              title={
+                <span>
+                  <WarningOutlined style={{ color: STATUS_WARNING, marginRight: 6 }} />
+                  Shubhali foydalanuvchilar
+                </span>
+              }
+              value={stats.suspicious_user_count}
+              valueStyle={{ color: STATUS_WARNING }}
+            />
           </Card>
         </Col>
-        <Col span={12}>
+        <Col xs={24} sm={12}>
           <Card>
-            <Statistic title="Bloklangan foydalanuvchilar" value={stats.blocked_user_count} valueStyle={{ color: "#ff4d4f" }} />
+            <Statistic
+              title={
+                <span>
+                  <StopOutlined style={{ color: STATUS_CRITICAL, marginRight: 6 }} />
+                  Bloklangan foydalanuvchilar
+                </span>
+              }
+              value={stats.blocked_user_count}
+              valueStyle={{ color: STATUS_CRITICAL }}
+            />
           </Card>
         </Col>
       </Row>

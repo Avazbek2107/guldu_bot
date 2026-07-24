@@ -1,12 +1,13 @@
 import { createContext, useContext, useEffect, useState, type ReactNode } from "react";
-import { fetchMe, login as loginApi } from "../api/auth";
+import { fetchMe, login as loginApi, logout as logoutApi } from "../api/auth";
+import { csrfState } from "../api/client";
 import type { UserOut } from "../types";
 
 interface AuthContextValue {
   user: UserOut | null;
   loading: boolean;
   login: (username: string, password: string) => Promise<void>;
-  logout: () => void;
+  logout: () => Promise<void>;
 }
 
 const AuthContext = createContext<AuthContextValue | undefined>(undefined);
@@ -16,26 +17,30 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    const token = localStorage.getItem("access_token");
-    if (!token) {
-      setLoading(false);
-      return;
-    }
     fetchMe()
-      .then(setUser)
-      .catch(() => localStorage.removeItem("access_token"))
+      .then((response) => {
+        csrfState.token = response.csrf_token;
+        setUser(response.user);
+      })
+      .catch(() => {
+        csrfState.token = null;
+      })
       .finally(() => setLoading(false));
   }, []);
 
   async function login(username: string, password: string) {
     const response = await loginApi(username, password);
-    localStorage.setItem("access_token", response.access_token);
+    csrfState.token = response.csrf_token;
     setUser(response.user);
   }
 
-  function logout() {
-    localStorage.removeItem("access_token");
-    setUser(null);
+  async function logout() {
+    try {
+      await logoutApi();
+    } finally {
+      csrfState.token = null;
+      setUser(null);
+    }
   }
 
   return <AuthContext.Provider value={{ user, loading, login, logout }}>{children}</AuthContext.Provider>;

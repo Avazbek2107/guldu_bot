@@ -6,10 +6,12 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import aliased
 
-from app.api.deps import get_current_user
+from app.api.deps import get_current_user, technician_faculty_ids
 from app.core.database import get_db
 from app.models.enums import TicketCategory, TicketPriority, TicketStatus, UserRole
 from app.models.faculty import Faculty
+from app.models.inventory_item import InventoryItem
+from app.models.technician_faculty_assignment import TechnicianFacultyAssignment
 from app.models.ticket import Ticket, TicketReassignment
 from app.models.user import User
 from app.schemas.ticket import TicketCloseRequest, TicketOut, TicketReassignRequest
@@ -18,18 +20,27 @@ from app.services.pdf_generator import generate_ticket_pdf, generate_tickets_lis
 
 router = APIRouter(prefix="/tickets", tags=["tickets"])
 
+TECHNICIAN_ROLES = (UserRole.TECHNICIAN_MAIN, UserRole.TECHNICIAN_BACKUP)
+
 
 def _can_access_ticket_faculty(current_user: User, faculty_id: int) -> bool:
     if current_user.role == UserRole.SUPER_ADMIN:
         return True
-    return (
-        current_user.role in (UserRole.TECHNICIAN_MAIN, UserRole.TECHNICIAN_BACKUP)
-        and current_user.faculty_id == faculty_id
+    return current_user.role in TECHNICIAN_ROLES and faculty_id in technician_faculty_ids(current_user)
+
+
+async def _is_technician_assigned(db: AsyncSession, user_id: int, faculty_id: int) -> bool:
+    result = await db.execute(
+        select(TechnicianFacultyAssignment.id).where(
+            TechnicianFacultyAssignment.user_id == user_id,
+            TechnicianFacultyAssignment.faculty_id == faculty_id,
+        )
     )
+    return result.scalar_one_or_none() is not None
 
 
 def _row_to_ticket_out(row) -> TicketOut:
-    ticket, faculty_name, creator_full_name, creator_phone, technician_full_name = row
+    ticket, faculty_name, creator_full_name, creator_phone, technician_full_name, inventory_number = row
     return TicketOut(
         id=ticket.id,
         ticket_number=ticket.ticket_number,
@@ -48,6 +59,8 @@ def _row_to_ticket_out(row) -> TicketOut:
         created_at=ticket.created_at,
         accepted_at=ticket.accepted_at,
         closed_at=ticket.closed_at,
+        inventory_item_id=ticket.inventory_item_id,
+        inventory_number=inventory_number,
     )
 
 
@@ -67,17 +80,28 @@ async def list_tickets(
     technician_alias = aliased(User)
 
     query = (
-        select(Ticket, Faculty.name, creator_alias.full_name, creator_alias.phone, technician_alias.full_name)
+        select(
+            Ticket,
+            Faculty.name,
+            creator_alias.full_name,
+            creator_alias.phone,
+            technician_alias.full_name,
+            InventoryItem.inventory_number,
+        )
         .join(Faculty, Ticket.faculty_id == Faculty.id)
         .join(creator_alias, Ticket.created_by_user_id == creator_alias.id)
         .outerjoin(technician_alias, Ticket.assigned_technician_id == technician_alias.id)
+        .outerjoin(InventoryItem, Ticket.inventory_item_id == InventoryItem.id)
     )
 
     if current_user.role == UserRole.SUPER_ADMIN:
         if faculty_id is not None:
             query = query.where(Ticket.faculty_id == faculty_id)
-    elif current_user.role in (UserRole.TECHNICIAN_MAIN, UserRole.TECHNICIAN_BACKUP):
-        query = query.where(Ticket.faculty_id == current_user.faculty_id)
+    elif current_user.role in TECHNICIAN_ROLES:
+        own_faculty_ids = technician_faculty_ids(current_user)
+        if not own_faculty_ids:
+            return []
+        query = query.where(Ticket.faculty_id.in_(own_faculty_ids))
     else:
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Bu amal uchun ruxsatingiz yo'q")
 
@@ -150,10 +174,18 @@ async def get_ticket(
     technician_alias = aliased(User)
 
     query = (
-        select(Ticket, Faculty.name, creator_alias.full_name, creator_alias.phone, technician_alias.full_name)
+        select(
+            Ticket,
+            Faculty.name,
+            creator_alias.full_name,
+            creator_alias.phone,
+            technician_alias.full_name,
+            InventoryItem.inventory_number,
+        )
         .join(Faculty, Ticket.faculty_id == Faculty.id)
         .join(creator_alias, Ticket.created_by_user_id == creator_alias.id)
         .outerjoin(technician_alias, Ticket.assigned_technician_id == technician_alias.id)
+        .outerjoin(InventoryItem, Ticket.inventory_item_id == InventoryItem.id)
         .where(Ticket.id == ticket_id)
     )
     result = await db.execute(query)
@@ -181,9 +213,17 @@ async def close_ticket(
     if not _can_access_ticket_faculty(current_user, ticket.faculty_id):
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Bu amal uchun ruxsatingiz yo'q")
 
+    inventory_item = await db.get(InventoryItem, payload.inventory_item_id)
+    if inventory_item is None or inventory_item.faculty_id != ticket.faculty_id:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Inventar topilmadi yoki bu fakultetga tegishli emas",
+        )
+
     ticket.status = TicketStatus.CLOSED
     ticket.closed_at = datetime.now(timezone.utc)
     ticket.resolution_comment = payload.resolution_comment
+    ticket.inventory_item_id = inventory_item.id
     await db.commit()
 
     return await get_ticket(ticket_id, db, current_user)
@@ -205,8 +245,8 @@ async def reassign_ticket(
     technician = await db.get(User, payload.technician_id)
     if (
         technician is None
-        or technician.role not in (UserRole.TECHNICIAN_MAIN, UserRole.TECHNICIAN_BACKUP)
-        or technician.faculty_id != ticket.faculty_id
+        or technician.role not in TECHNICIAN_ROLES
+        or not await _is_technician_assigned(db, technician.id, ticket.faculty_id)
     ):
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST, detail="Texnik xodim shu fakultetga tegishli emas"

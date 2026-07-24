@@ -1,5 +1,10 @@
 import { apiClient } from "./client";
-import type { UserOut, UserRole } from "../types";
+import type { TechnicianRole, UserOut, UserRole } from "../types";
+
+export interface FacultyAssignmentInput {
+  faculty_id: number;
+  role: TechnicianRole;
+}
 
 export interface UserCreatePayload {
   username: string;
@@ -7,7 +12,7 @@ export interface UserCreatePayload {
   full_name: string;
   phone: string;
   role: UserRole;
-  faculty_id: number | null;
+  faculty_assignments: FacultyAssignmentInput[];
   telegram_id?: number | null;
 }
 
@@ -15,6 +20,7 @@ export interface UserUpdatePayload {
   full_name?: string;
   phone?: string;
   faculty_id?: number | null;
+  faculty_assignments?: FacultyAssignmentInput[];
   password?: string;
   telegram_id?: number | null;
 }

@@ -25,9 +25,12 @@ class TicketOut(BaseModel):
     created_at: datetime
     accepted_at: datetime | None
     closed_at: datetime | None
+    inventory_item_id: int | None
+    inventory_number: str | None
 
 
 class TicketCloseRequest(BaseModel):
+    inventory_item_id: int
     resolution_comment: str | None = None
 
 

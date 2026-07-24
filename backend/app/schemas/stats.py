@@ -27,7 +27,6 @@ class FacultyStat(BaseModel):
 class TechnicianStat(BaseModel):
     technician_id: int
     full_name: str
-    faculty_id: int | None
     accepted: int
     closed: int
     open_remaining: int

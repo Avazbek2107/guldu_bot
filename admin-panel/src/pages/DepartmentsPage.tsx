@@ -5,8 +5,8 @@ import { createFaculty, listFaculties, updateFaculty } from "../api/faculties";
 import { listUsers } from "../api/users";
 import type { FacultyOut, UserOut } from "../types";
 
-export function FacultiesPage() {
-  const [faculties, setFaculties] = useState<FacultyOut[]>([]);
+export function DepartmentsPage() {
+  const [departments, setDepartments] = useState<FacultyOut[]>([]);
   const [technicians, setTechnicians] = useState<UserOut[]>([]);
   const [loading, setLoading] = useState(true);
 
@@ -19,12 +19,12 @@ export function FacultiesPage() {
   async function loadData() {
     setLoading(true);
     try {
-      const [facultyList, mainTechs, backupTechs] = await Promise.all([
-        listFaculties("faculty"),
+      const [departmentList, mainTechs, backupTechs] = await Promise.all([
+        listFaculties("department"),
         listUsers({ role: "technician_main" }),
         listUsers({ role: "technician_backup" }),
       ]);
-      setFaculties(facultyList);
+      setDepartments(departmentList);
       setTechnicians([...mainTechs, ...backupTechs]);
     } finally {
       setLoading(false);
@@ -35,9 +35,9 @@ export function FacultiesPage() {
     loadData();
   }, []);
 
-  function techniciansFor(facultyId: number, role: "technician_main" | "technician_backup") {
+  function techniciansFor(departmentId: number, role: "technician_main" | "technician_backup") {
     const names = technicians
-      .filter((t) => (t.faculty_assignments ?? []).some((a) => a.faculty_id === facultyId && a.role === role))
+      .filter((t) => (t.faculty_assignments ?? []).some((a) => a.faculty_id === departmentId && a.role === role))
       .map((t) => t.full_name);
     return names.length > 0 ? names.join(", ") : "-";
   }
@@ -45,8 +45,8 @@ export function FacultiesPage() {
   async function handleCreate(values: { name: string }) {
     setSaving(true);
     try {
-      await createFaculty(values.name);
-      message.success("Fakultet qo'shildi");
+      await createFaculty(values.name, "department");
+      message.success("Bo'lim qo'shildi");
       setCreateOpen(false);
       createForm.resetFields();
       loadData();
@@ -76,7 +76,7 @@ export function FacultiesPage() {
     <div>
       <Space style={{ marginBottom: 16 }} wrap>
         <Button type="primary" icon={<PlusOutlined />} onClick={() => setCreateOpen(true)}>
-          Yangi fakultet
+          Yangi bo'lim
         </Button>
       </Space>
 
@@ -84,7 +84,7 @@ export function FacultiesPage() {
         rowKey="id"
         loading={loading}
         scroll={{ x: "max-content" }}
-        dataSource={faculties}
+        dataSource={departments}
         columns={[
           { title: "Nomi", dataIndex: "name" },
           {
@@ -118,7 +118,7 @@ export function FacultiesPage() {
       />
 
       <Modal
-        title="Yangi fakultet"
+        title="Yangi bo'lim"
         open={createOpen}
         onCancel={() => setCreateOpen(false)}
         onOk={() => createForm.submit()}
@@ -127,7 +127,7 @@ export function FacultiesPage() {
         cancelText="Bekor qilish"
       >
         <Form form={createForm} layout="vertical" onFinish={handleCreate}>
-          <Form.Item name="name" label="Fakultet nomi" rules={[{ required: true }]}>
+          <Form.Item name="name" label="Bo'lim nomi" rules={[{ required: true }]}>
             <Input />
           </Form.Item>
         </Form>
@@ -143,7 +143,7 @@ export function FacultiesPage() {
         cancelText="Bekor qilish"
       >
         <Form form={renameForm} layout="vertical" onFinish={handleRename}>
-          <Form.Item name="name" label="Fakultet nomi" rules={[{ required: true }]}>
+          <Form.Item name="name" label="Bo'lim nomi" rules={[{ required: true }]}>
             <Input />
           </Form.Item>
         </Form>

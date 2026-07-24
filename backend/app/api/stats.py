@@ -81,7 +81,6 @@ async def get_dashboard_stats(db: AsyncSession = Depends(get_db)):
             TechnicianStat(
                 technician_id=tech.id,
                 full_name=tech.full_name,
-                faculty_id=tech.faculty_id,
                 accepted=accepted,
                 closed=closed,
                 open_remaining=open_remaining,

@@ -1,18 +1,21 @@
 import { apiClient } from "./client";
 import type { UserOut } from "../types";
 
-export interface LoginResponse {
-  access_token: string;
-  token_type: string;
+export interface AuthResponse {
+  csrf_token: string;
   user: UserOut;
 }
 
-export async function login(username: string, password: string): Promise<LoginResponse> {
-  const { data } = await apiClient.post<LoginResponse>("/auth/login", { username, password });
+export async function login(username: string, password: string): Promise<AuthResponse> {
+  const { data } = await apiClient.post<AuthResponse>("/auth/login", { username, password });
   return data;
 }
 
-export async function fetchMe(): Promise<UserOut> {
-  const { data } = await apiClient.get<UserOut>("/auth/me");
+export async function fetchMe(): Promise<AuthResponse> {
+  const { data } = await apiClient.get<AuthResponse>("/auth/me");
   return data;
+}
+
+export async function logout(): Promise<void> {
+  await apiClient.post("/auth/logout");
 }

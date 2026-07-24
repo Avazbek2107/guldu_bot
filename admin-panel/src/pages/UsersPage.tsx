@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { Button, Form, Input, InputNumber, Modal, Popconfirm, Select, Space, Table, Tag, message } from "antd";
-import { PlusOutlined } from "@ant-design/icons";
+import { MinusCircleOutlined, PlusOutlined } from "@ant-design/icons";
 import {
   blockUser,
   createUser,
@@ -8,13 +8,106 @@ import {
   listUsers,
   unblockUser,
   updateUser,
-  type UserCreatePayload,
+  type FacultyAssignmentInput,
 } from "../api/users";
 import { listFaculties } from "../api/faculties";
-import { ROLE_LABELS_UZ, type FacultyOut, type UserOut, type UserRole } from "../types";
+import {
+  orgUnitLabel,
+  ROLE_LABELS_UZ,
+  type FacultyOut,
+  type TechnicianRole,
+  type UserOut,
+  type UserRole,
+} from "../types";
 
 const EMPLOYEE_ROLES: UserRole[] = ["technician_main", "technician_backup", "super_admin"];
-const CREATABLE_ROLES: UserRole[] = EMPLOYEE_ROLES;
+const TECHNICIAN_ROLES: UserRole[] = ["technician_main", "technician_backup"];
+
+type UiRole = "technician" | "super_admin";
+
+const UI_ROLE_OPTIONS: { value: UiRole; label: string }[] = [
+  { value: "technician", label: "Texnik xodim" },
+  { value: "super_admin", label: "Super Admin" },
+];
+
+const FACULTY_ROLE_OPTIONS: { value: TechnicianRole; label: string }[] = [
+  { value: "technician_main", label: "Asosiy" },
+  { value: "technician_backup", label: "Zaxira" },
+];
+
+function resolveTechnicianRole(assignments: FacultyAssignmentInput[]): UserRole {
+  return assignments.some((a) => a.role === "technician_main") ? "technician_main" : "technician_backup";
+}
+
+interface CreateFormValues {
+  full_name: string;
+  phone: string;
+  username: string;
+  password: string;
+  uiRole: UiRole;
+  faculty_assignments?: FacultyAssignmentInput[];
+  telegram_id?: number;
+}
+
+interface EditFormValues {
+  full_name: string;
+  phone: string;
+  password?: string;
+  telegram_id?: number;
+  faculty_assignments?: FacultyAssignmentInput[];
+}
+
+function FacultyAssignmentsList({ faculties }: { faculties: FacultyOut[] }) {
+  return (
+    <Form.List
+      name="faculty_assignments"
+      rules={[
+        {
+          validator: async (_, assignments: FacultyAssignmentInput[] | undefined) => {
+            if (!assignments || assignments.length === 0) {
+              return Promise.reject(new Error("Kamida bitta fakultet tanlang"));
+            }
+          },
+        },
+      ]}
+    >
+      {(fields, { add, remove }, { errors }) => (
+        <>
+          {fields.map((field) => (
+            <Space key={field.key} align="baseline" wrap style={{ display: "flex", width: "100%", marginBottom: 8 }}>
+              <Form.Item
+                name={[field.name, "faculty_id"]}
+                rules={[{ required: true, message: "Fakultetni tanlang" }]}
+                style={{ marginBottom: 0, flex: "1 1 160px" }}
+              >
+                <Select
+                  placeholder="Fakultet"
+                  style={{ width: "100%", minWidth: 140 }}
+                  options={faculties.map((f) => ({ value: f.id, label: orgUnitLabel(f) }))}
+                />
+              </Form.Item>
+              <Form.Item
+                name={[field.name, "role"]}
+                rules={[{ required: true, message: "Lavozimni tanlang" }]}
+                initialValue="technician_backup"
+                style={{ marginBottom: 0, flex: "1 1 120px" }}
+              >
+                <Select style={{ width: "100%", minWidth: 110 }} options={FACULTY_ROLE_OPTIONS} />
+              </Form.Item>
+              <MinusCircleOutlined onClick={() => remove(field.name)} />
+            </Space>
+          ))}
+          <Form.Item style={{ marginBottom: 0 }}>
+            <Button type="dashed" onClick={() => add()} block icon={<PlusOutlined />}>
+              Fakultet qo'shish
+            </Button>
+            <Form.ErrorList errors={errors} />
+          </Form.Item>
+        </>
+      )}
+    </Form.List>
+  );
+}
 
 export function UsersPage() {
   const [users, setUsers] = useState<UserOut[]>([]);
@@ -24,11 +117,9 @@ export function UsersPage() {
 
   const [createOpen, setCreateOpen] = useState(false);
   const [editTarget, setEditTarget] = useState<UserOut | null>(null);
-  const [createForm] = Form.useForm<UserCreatePayload>();
-  const [editForm] = Form.useForm();
+  const [createForm] = Form.useForm<CreateFormValues>();
+  const [editForm] = Form.useForm<EditFormValues>();
   const [saving, setSaving] = useState(false);
-
-  const facultyName = (id: number | null) => faculties.find((f) => f.id === id)?.name ?? "-";
 
   async function loadUsers() {
     setLoading(true);
@@ -48,10 +139,19 @@ export function UsersPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [roleFilter]);
 
-  async function handleCreate(values: UserCreatePayload) {
+  async function handleCreate(values: CreateFormValues) {
     setSaving(true);
     try {
-      await createUser(values);
+      const assignments = values.uiRole === "technician" ? values.faculty_assignments ?? [] : [];
+      await createUser({
+        username: values.username,
+        password: values.password,
+        full_name: values.full_name,
+        phone: values.phone,
+        role: values.uiRole === "super_admin" ? "super_admin" : resolveTechnicianRole(assignments),
+        faculty_assignments: assignments,
+        telegram_id: values.telegram_id ?? null,
+      });
       message.success("Xodim yaratildi");
       setCreateOpen(false);
       createForm.resetFields();
@@ -63,22 +163,17 @@ export function UsersPage() {
     }
   }
 
-  async function handleEditSave(values: {
-    full_name: string;
-    phone: string;
-    faculty_id?: number;
-    password?: string;
-    telegram_id?: number;
-  }) {
+  async function handleEditSave(values: EditFormValues) {
     if (!editTarget) return;
+    const isTechnician = TECHNICIAN_ROLES.includes(editTarget.role);
     setSaving(true);
     try {
       await updateUser(editTarget.id, {
         full_name: values.full_name,
         phone: values.phone,
-        faculty_id: values.faculty_id ?? null,
         password: values.password || undefined,
         telegram_id: values.telegram_id ?? null,
+        ...(isTechnician ? { faculty_assignments: values.faculty_assignments ?? [] } : {}),
       });
       message.success("Saqlandi");
       setEditTarget(null);
@@ -115,9 +210,11 @@ export function UsersPage() {
     }
   }
 
+  const editTargetIsTechnician = editTarget != null && TECHNICIAN_ROLES.includes(editTarget.role);
+
   return (
     <div>
-      <Space style={{ marginBottom: 16 }}>
+      <Space style={{ marginBottom: 16 }} wrap>
         <Select
           allowClear
           placeholder="Rol bo'yicha filtrlash"
@@ -134,13 +231,30 @@ export function UsersPage() {
       <Table
         rowKey="id"
         loading={loading}
+        scroll={{ x: "max-content" }}
         dataSource={users}
         columns={[
           { title: "FISH", dataIndex: "full_name" },
           { title: "Login", dataIndex: "username", render: (v: string | null) => v ?? "-" },
           { title: "Telefon", dataIndex: "phone" },
           { title: "Rol", dataIndex: "role", render: (v: UserRole) => ROLE_LABELS_UZ[v] },
-          { title: "Fakultet", dataIndex: "faculty_id", render: (v: number | null) => facultyName(v) },
+          {
+            title: "Fakultet(lar)",
+            key: "faculties",
+            render: (_: unknown, record: UserOut) => {
+              const assignments = record.faculty_assignments ?? [];
+              if (assignments.length === 0) return "-";
+              return (
+                <Space direction="vertical" size={4}>
+                  {assignments.map((a) => (
+                    <Tag key={a.faculty_id} color={a.role === "technician_main" ? "gold" : "default"}>
+                      {a.faculty_name} — {a.role === "technician_main" ? "asosiy" : "zaxira"}
+                    </Tag>
+                  ))}
+                </Space>
+              );
+            },
+          },
           {
             title: "Telegram",
             dataIndex: "telegram_id",
@@ -170,8 +284,11 @@ export function UsersPage() {
                     editForm.setFieldsValue({
                       full_name: record.full_name,
                       phone: record.phone,
-                      faculty_id: record.faculty_id ?? undefined,
                       telegram_id: record.telegram_id ?? undefined,
+                      faculty_assignments: (record.faculty_assignments ?? []).map((a) => ({
+                        faculty_id: a.faculty_id,
+                        role: a.role,
+                      })),
                     });
                   }}
                 >
@@ -200,7 +317,7 @@ export function UsersPage() {
         okText="Yaratish"
         cancelText="Bekor qilish"
       >
-        <Form form={createForm} layout="vertical" onFinish={handleCreate}>
+        <Form form={createForm} layout="vertical" onFinish={handleCreate} initialValues={{ uiRole: "technician" }}>
           <Form.Item name="full_name" label="FISH" rules={[{ required: true }]}>
             <Input />
           </Form.Item>
@@ -227,15 +344,20 @@ export function UsersPage() {
           >
             <Input.Password />
           </Form.Item>
-          <Form.Item name="role" label="Rol" rules={[{ required: true }]}>
-            <Select options={CREATABLE_ROLES.map((r) => ({ value: r, label: ROLE_LABELS_UZ[r] }))} />
+          <Form.Item name="uiRole" label="Rol" rules={[{ required: true }]}>
+            <Select options={UI_ROLE_OPTIONS} />
           </Form.Item>
-          <Form.Item name="faculty_id" label="Fakultet">
-            <Select
-              allowClear
-              placeholder="Super Admin uchun bo'sh qoldiring"
-              options={faculties.map((f) => ({ value: f.id, label: f.name }))}
-            />
+          <Form.Item
+            noStyle
+            shouldUpdate={(prev: CreateFormValues, cur: CreateFormValues) => prev.uiRole !== cur.uiRole}
+          >
+            {({ getFieldValue }) =>
+              getFieldValue("uiRole") === "technician" ? (
+                <Form.Item label="Fakultet biriktirishlar">
+                  <FacultyAssignmentsList faculties={faculties} />
+                </Form.Item>
+              ) : null
+            }
           </Form.Item>
           <Form.Item
             name="telegram_id"
@@ -263,9 +385,11 @@ export function UsersPage() {
           <Form.Item name="phone" label="Telefon" rules={[{ required: true }]}>
             <Input />
           </Form.Item>
-          <Form.Item name="faculty_id" label="Fakultet">
-            <Select allowClear options={faculties.map((f) => ({ value: f.id, label: f.name }))} />
-          </Form.Item>
+          {editTargetIsTechnician && (
+            <Form.Item label="Fakultet biriktirishlar">
+              <FacultyAssignmentsList faculties={faculties} />
+            </Form.Item>
+          )}
           <Form.Item
             name="telegram_id"
             label="Telegram ID (ixtiyoriy)"

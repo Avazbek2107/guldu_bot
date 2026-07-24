@@ -37,6 +37,9 @@ class Ticket(Base, TimestampMixin):
         index=True,
     )
     assigned_technician_id: Mapped[int | None] = mapped_column(ForeignKey("users.id"), nullable=True, index=True)
+    inventory_item_id: Mapped[int | None] = mapped_column(
+        ForeignKey("inventory_items.id", ondelete="SET NULL"), nullable=True, index=True
+    )
 
     resolution_comment: Mapped[str | None] = mapped_column(Text, nullable=True)
 
@@ -54,6 +57,7 @@ class Ticket(Base, TimestampMixin):
         back_populates="tickets_assigned", foreign_keys=[assigned_technician_id]
     )
     faculty: Mapped["Faculty"] = relationship(back_populates="tickets")
+    inventory_item: Mapped["InventoryItem | None"] = relationship(back_populates="repairs")
 
     attachments: Mapped[list["TicketAttachment"]] = relationship(back_populates="ticket", cascade="all, delete-orphan")
     reassignments: Mapped[list["TicketReassignment"]] = relationship(

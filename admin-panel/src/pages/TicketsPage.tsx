@@ -14,13 +14,16 @@ import { FileExcelOutlined, FilePdfOutlined } from "@ant-design/icons";
 import { downloadTicketPdf } from "../api/client";
 import { closeTicket, exportTickets, listTickets, reassignTicket, type TicketFilters } from "../api/tickets";
 import { listFaculties } from "../api/faculties";
+import { listInventory } from "../api/inventory";
 import { listUsers } from "../api/users";
 import { useAuth } from "../auth/AuthContext";
 import {
   CATEGORY_LABELS_UZ,
+  orgUnitLabel,
   PRIORITY_LABELS_UZ,
   STATUS_LABELS_UZ,
   type FacultyOut,
+  type InventoryItemOut,
   type TicketCategory,
   type TicketOut,
   type TicketStatus,
@@ -48,6 +51,9 @@ export function TicketsPage() {
 
   const [closeTarget, setCloseTarget] = useState<TicketOut | null>(null);
   const [resolutionComment, setResolutionComment] = useState("");
+  const [closeInventoryOptions, setCloseInventoryOptions] = useState<InventoryItemOut[]>([]);
+  const [closeInventoryId, setCloseInventoryId] = useState<number | undefined>();
+  const [closeInventoryLoading, setCloseInventoryLoading] = useState(false);
   const [reassignTarget, setReassignTarget] = useState<TicketOut | null>(null);
   const [reassignTechnicianId, setReassignTechnicianId] = useState<number | undefined>();
   const [actionLoading, setActionLoading] = useState(false);
@@ -108,18 +114,32 @@ export function TicketsPage() {
   }, [facultyFilter, statusFilter, categoryFilter]);
 
   const technicianOptionsForFaculty = useMemo(
-    () => (facultyId: number) => technicians.filter((t) => t.faculty_id === facultyId),
+    () => (facultyId: number) =>
+      technicians.filter((t) => (t.faculty_assignments ?? []).some((a) => a.faculty_id === facultyId)),
     [technicians],
   );
 
+  async function openCloseModal(record: TicketOut) {
+    setCloseTarget(record);
+    setCloseInventoryId(undefined);
+    setCloseInventoryOptions([]);
+    setCloseInventoryLoading(true);
+    try {
+      setCloseInventoryOptions(await listInventory(record.faculty_id));
+    } finally {
+      setCloseInventoryLoading(false);
+    }
+  }
+
   async function handleClose() {
-    if (!closeTarget) return;
+    if (!closeTarget || !closeInventoryId) return;
     setActionLoading(true);
     try {
-      await closeTicket(closeTarget.id, resolutionComment || null);
+      await closeTicket(closeTarget.id, resolutionComment || null, closeInventoryId);
       message.success(`Ariza #${closeTarget.ticket_number} yopildi`);
       setCloseTarget(null);
       setResolutionComment("");
+      setCloseInventoryId(undefined);
       loadTickets();
     } catch {
       message.error("Xatolik yuz berdi");
@@ -154,7 +174,7 @@ export function TicketsPage() {
             style={{ width: 180 }}
             value={facultyFilter}
             onChange={setFacultyFilter}
-            options={faculties.map((f) => ({ label: f.name, value: f.id }))}
+            options={faculties.map((f) => ({ label: orgUnitLabel(f), value: f.id }))}
           />
         )}
         <Select
@@ -184,6 +204,7 @@ export function TicketsPage() {
       <Table
         rowKey="id"
         loading={loading}
+        scroll={{ x: "max-content" }}
         dataSource={tickets}
         columns={[
           { title: "Ariza №", dataIndex: "ticket_number" },
@@ -226,7 +247,7 @@ export function TicketsPage() {
                 </Tooltip>
                 {record.status !== "closed" && (
                   <>
-                    <Button size="small" onClick={() => setCloseTarget(record)}>
+                    <Button size="small" onClick={() => openCloseModal(record)}>
                       Yopish
                     </Button>
                     <Button size="small" onClick={() => setReassignTarget(record)}>
@@ -248,7 +269,32 @@ export function TicketsPage() {
         confirmLoading={actionLoading}
         okText="Yopish"
         cancelText="Bekor qilish"
+        okButtonProps={{ disabled: !closeInventoryId }}
       >
+        <div style={{ marginBottom: 12 }}>
+          <div style={{ marginBottom: 4 }}>
+            Ta'mirlangan qurilma (inventar) <span style={{ color: "red" }}>*</span>
+          </div>
+          <Select
+            showSearch
+            allowClear
+            loading={closeInventoryLoading}
+            style={{ width: "100%" }}
+            placeholder="Inventarni tanlang"
+            value={closeInventoryId}
+            onChange={setCloseInventoryId}
+            filterOption={(input, option) =>
+              (option?.label as string).toLowerCase().includes(input.toLowerCase())
+            }
+            options={closeInventoryOptions.map((item) => ({
+              value: item.id,
+              label: `${item.room ?? "xonasiz"} — ${item.inventory_number ?? "raqamsiz"} (${item.model ?? item.inventory_type ?? "?"})`,
+            }))}
+            notFoundContent={
+              closeInventoryLoading ? undefined : "Bu fakultetda inventar topilmadi. Avval Inventar sahifasida qo'shing."
+            }
+          />
+        </div>
         <Input.TextArea
           rows={3}
           placeholder="Yechim izohi (ixtiyoriy)"

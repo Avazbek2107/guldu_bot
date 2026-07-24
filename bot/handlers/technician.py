@@ -14,11 +14,13 @@ from app.models.user import User
 from app.services.pdf_generator import generate_ticket_pdf
 
 from bot.keyboards import suspicious_keyboard, technician_choice_keyboard, ticket_actions_keyboard
+from bot.services.inventory import count_repairs, find_inventory_item
 from bot.services.tickets import (
     accept_ticket,
     can_close_ticket,
     close_ticket,
     get_faculty_technicians,
+    is_technician_assigned,
     notify_reassignment,
     notify_ticket_accepted,
     notify_ticket_closed,
@@ -44,10 +46,10 @@ async def handle_accept(callback: CallbackQuery) -> None:
         if technician is None or ticket is None:
             await callback.answer("Topilmadi", show_alert=True)
             return
-        if (
-            technician.role not in (UserRole.TECHNICIAN_MAIN, UserRole.TECHNICIAN_BACKUP)
-            or technician.faculty_id != ticket.faculty_id
-        ):
+        if technician.role not in (
+            UserRole.TECHNICIAN_MAIN,
+            UserRole.TECHNICIAN_BACKUP,
+        ) or not await is_technician_assigned(db, technician.id, ticket.faculty_id):
             await callback.answer("Sizda bu huquq yo'q", show_alert=True)
             return
         if ticket.status != TicketStatus.OPEN:
@@ -73,14 +75,39 @@ async def handle_close_start(callback: CallbackQuery, state: FSMContext) -> None
     async with async_session_factory() as db:
         technician = await get_user_by_telegram_id(db, callback.from_user.id)
         ticket = await _get_ticket(db, ticket_id)
-        if technician is None or ticket is None or not can_close_ticket(ticket, technician):
+        if technician is None or ticket is None or not await can_close_ticket(db, ticket, technician):
             await callback.answer("Sizda bu huquq yo'q", show_alert=True)
             return
 
     await state.update_data(ticket_id=ticket_id)
-    await state.set_state(CloseTicket.waiting_comment)
-    await callback.message.answer("Yechim izohini yozing (yoki '-' yuboring):")
+    await state.set_state(CloseTicket.waiting_inventory_number)
+    await callback.message.answer("Ta'mirlangan qurilmaning inventar raqamini kiriting:")
     await callback.answer()
+
+
+@router.message(StateFilter(CloseTicket.waiting_inventory_number))
+async def handle_close_inventory_number(message: Message, state: FSMContext) -> None:
+    number = (message.text or "").strip()
+    data = await state.get_data()
+
+    async with async_session_factory() as db:
+        ticket = await _get_ticket(db, data["ticket_id"])
+        if ticket is None:
+            await state.clear()
+            await message.answer("Ariza topilmadi.")
+            return
+        item = await find_inventory_item(db, ticket.faculty_id, number)
+
+    if item is None:
+        await message.answer(
+            "Bu raqam bilan inventar topilmadi. Iltimos, raqamni tekshirib qayta kiriting "
+            "(yoki avval admin panelda ro'yxatdan o'tkazing)."
+        )
+        return
+
+    await state.update_data(inventory_item_id=item.id)
+    await state.set_state(CloseTicket.waiting_comment)
+    await message.answer("Yechim izohini yozing (yoki '-' yuboring):")
 
 
 @router.message(StateFilter(CloseTicket.waiting_comment))
@@ -98,13 +125,22 @@ async def _do_close(
     async with async_session_factory() as db:
         technician = await get_user_by_telegram_id(db, telegram_id)
         ticket = await _get_ticket(db, ticket_id)
-        if technician is None or ticket is None or not can_close_ticket(ticket, technician):
+        if (
+            technician is None
+            or ticket is None
+            or not await can_close_ticket(db, ticket, technician)
+            or data.get("inventory_item_id") is None
+        ):
             await state.clear()
             return None
-        await close_ticket(db, ticket, data.get("resolution_comment"), is_suspicious, suspicious_comment)
+        await close_ticket(
+            db, ticket, data.get("resolution_comment"), is_suspicious, suspicious_comment, data["inventory_item_id"]
+        )
         creator = await db.get(User, ticket.created_by_user_id)
         await notify_ticket_closed(bot, ticket, creator)
+        repair_count = await count_repairs(db, data["inventory_item_id"])
     await state.clear()
+    ticket.repair_count = repair_count
     return ticket
 
 
@@ -130,7 +166,9 @@ async def handle_suspicious_choice(callback: CallbackQuery, state: FSMContext) -
         await callback.message.answer("Amalni bajarib bo'lmadi: ariza topilmadi yoki huquqingiz yo'q.")
         await callback.answer()
         return
-    await callback.message.answer(f"✅ Ariza #{ticket.ticket_number} yopildi.")
+    await callback.message.answer(
+        f"✅ Ariza #{ticket.ticket_number} yopildi. Bu qurilma jami {ticket.repair_count} marta ta'mirlangan."
+    )
     await callback.answer()
 
 
@@ -141,7 +179,9 @@ async def handle_suspicious_comment(message: Message, state: FSMContext) -> None
     if ticket is None:
         await message.answer("Amalni bajarib bo'lmadi: ariza topilmadi yoki huquqingiz yo'q.")
         return
-    await message.answer(f"✅ Ariza #{ticket.ticket_number} yopildi.")
+    await message.answer(
+        f"✅ Ariza #{ticket.ticket_number} yopildi. Bu qurilma jami {ticket.repair_count} marta ta'mirlangan."
+    )
 
 
 @router.callback_query(F.data.startswith("reassign:"))
@@ -155,7 +195,7 @@ async def handle_reassign_start(callback: CallbackQuery, state: FSMContext) -> N
             technician is None
             or ticket is None
             or technician.role not in (UserRole.TECHNICIAN_MAIN, UserRole.TECHNICIAN_BACKUP)
-            or technician.faculty_id != ticket.faculty_id
+            or not await is_technician_assigned(db, technician.id, ticket.faculty_id)
         ):
             await callback.answer("Sizda bu huquq yo'q", show_alert=True)
             return
@@ -202,8 +242,8 @@ async def handle_reassign_reason(message: Message, state: FSMContext) -> None:
             or ticket is None
             or to_technician is None
             or from_technician.role not in (UserRole.TECHNICIAN_MAIN, UserRole.TECHNICIAN_BACKUP)
-            or from_technician.faculty_id != ticket.faculty_id
-            or to_technician.faculty_id != ticket.faculty_id
+            or not await is_technician_assigned(db, from_technician.id, ticket.faculty_id)
+            or not await is_technician_assigned(db, to_technician.id, ticket.faculty_id)
         ):
             await state.clear()
             await message.answer("Amalni bajarib bo'lmadi: ariza topilmadi yoki huquqingiz yo'q.")
@@ -226,7 +266,10 @@ async def handle_pdf(callback: CallbackQuery) -> None:
             technician is None
             or ticket is None
             or technician.role not in (UserRole.TECHNICIAN_MAIN, UserRole.TECHNICIAN_BACKUP, UserRole.SUPER_ADMIN)
-            or (technician.role != UserRole.SUPER_ADMIN and technician.faculty_id != ticket.faculty_id)
+            or (
+                technician.role != UserRole.SUPER_ADMIN
+                and not await is_technician_assigned(db, technician.id, ticket.faculty_id)
+            )
         ):
             await callback.answer("Sizda bu huquq yo'q", show_alert=True)
             return

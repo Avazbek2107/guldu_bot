@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 import { Button, Form, Input, InputNumber, Modal, Popconfirm, Select, Space, Table, Tag, message } from "antd";
 import { blockUser, deleteUser, listUsers, unblockUser, updateUser } from "../api/users";
 import { listFaculties } from "../api/faculties";
-import type { FacultyOut, UserOut } from "../types";
+import { orgUnitLabel, type FacultyOut, type UserOut } from "../types";
 
 export function EndUsersPage() {
   const [users, setUsers] = useState<UserOut[]>([]);
@@ -81,19 +81,20 @@ export function EndUsersPage() {
 
   return (
     <div>
-      <Space style={{ marginBottom: 16 }}>
+      <Space style={{ marginBottom: 16 }} wrap>
         <Select
           allowClear
           placeholder="Fakultet bo'yicha filtrlash"
           style={{ width: 240 }}
           value={facultyFilter}
           onChange={setFacultyFilter}
-          options={faculties.map((f) => ({ value: f.id, label: f.name }))}
+          options={faculties.map((f) => ({ value: f.id, label: orgUnitLabel(f) }))}
         />
       </Space>
 
       <Table
         rowKey="id"
+        scroll={{ x: "max-content" }}
         loading={loading}
         dataSource={users}
         columns={[
@@ -167,7 +168,7 @@ export function EndUsersPage() {
             <Input />
           </Form.Item>
           <Form.Item name="faculty_id" label="Fakultet">
-            <Select allowClear options={faculties.map((f) => ({ value: f.id, label: f.name }))} />
+            <Select allowClear options={faculties.map((f) => ({ value: f.id, label: orgUnitLabel(f) }))} />
           </Form.Item>
           <Form.Item
             name="telegram_id"

@@ -7,6 +7,8 @@ import { TicketsPage } from "./pages/TicketsPage";
 import { UsersPage } from "./pages/UsersPage";
 import { EndUsersPage } from "./pages/EndUsersPage";
 import { FacultiesPage } from "./pages/FacultiesPage";
+import { DepartmentsPage } from "./pages/DepartmentsPage";
+import { InventoryPage } from "./pages/InventoryPage";
 
 function App() {
   return (
@@ -17,12 +19,14 @@ function App() {
         <Route element={<AppLayout />}>
           <Route index element={<Navigate to="/tickets" replace />} />
           <Route path="/tickets" element={<TicketsPage />} />
+          <Route path="/inventory" element={<InventoryPage />} />
 
           <Route element={<ProtectedRoute allowedRoles={["super_admin"]} />}>
             <Route path="/dashboard" element={<DashboardPage />} />
             <Route path="/users" element={<UsersPage />} />
             <Route path="/end-users" element={<EndUsersPage />} />
             <Route path="/faculties" element={<FacultiesPage />} />
+            <Route path="/departments" element={<DepartmentsPage />} />
           </Route>
         </Route>
       </Route>

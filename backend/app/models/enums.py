@@ -8,6 +8,16 @@ class UserRole(str, enum.Enum):
     FACULTY_STAFF = "faculty_staff"
 
 
+class TechnicianFacultyRole(str, enum.Enum):
+    TECHNICIAN_MAIN = "technician_main"
+    TECHNICIAN_BACKUP = "technician_backup"
+
+
+class OrgUnitType(str, enum.Enum):
+    FACULTY = "faculty"
+    DEPARTMENT = "department"
+
+
 class TicketCategory(str, enum.Enum):
     COMPUTER = "computer"
     NETWORK = "network"

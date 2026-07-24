@@ -89,7 +89,7 @@ async def handle_full_name(message: Message, state: FSMContext) -> None:
         faculties = list(result.scalars().all())
 
     await state.set_state(Registration.waiting_faculty)
-    await message.answer("Fakultetingizni tanlang:", reply_markup=faculty_keyboard(faculties))
+    await message.answer("Fakultet yoki bo'limingizni tanlang:", reply_markup=faculty_keyboard(faculties))
 
 
 @router.callback_query(StateFilter(Registration.waiting_faculty), F.data.startswith("faculty:"))
@@ -130,7 +130,7 @@ async def cmd_profile(message: Message, state: FSMContext) -> None:
         faculties = list(result.scalars().all())
 
     await state.set_state(ProfileChange.waiting_faculty)
-    await message.answer("Yangi fakultetingizni tanlang:", reply_markup=faculty_keyboard(faculties))
+    await message.answer("Yangi fakultet yoki bo'limingizni tanlang:", reply_markup=faculty_keyboard(faculties))
 
 
 @router.callback_query(StateFilter(ProfileChange.waiting_faculty), F.data.startswith("faculty:"))

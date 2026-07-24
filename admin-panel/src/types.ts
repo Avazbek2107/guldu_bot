@@ -41,6 +41,14 @@ export const ROLE_LABELS_UZ: Record<UserRole, string> = {
   faculty_staff: "Fakultet xodimi",
 };
 
+export type TechnicianRole = "technician_main" | "technician_backup";
+
+export interface FacultyAssignment {
+  faculty_id: number;
+  faculty_name: string;
+  role: TechnicianRole;
+}
+
 export interface UserOut {
   id: number;
   username: string | null;
@@ -48,14 +56,22 @@ export interface UserOut {
   phone: string;
   role: UserRole;
   faculty_id: number | null;
+  faculty_assignments: FacultyAssignment[];
   telegram_id: number | null;
   is_blocked: boolean;
   is_suspicious: boolean;
 }
 
+export type OrgUnitType = "faculty" | "department";
+
 export interface FacultyOut {
   id: number;
   name: string;
+  unit_type: OrgUnitType;
+}
+
+export function orgUnitLabel(f: FacultyOut): string {
+  return f.unit_type === "department" ? `${f.name} (bo'lim)` : f.name;
 }
 
 export interface TicketOut {
@@ -76,6 +92,45 @@ export interface TicketOut {
   created_at: string;
   accepted_at: string | null;
   closed_at: string | null;
+  inventory_item_id: number | null;
+  inventory_number: string | null;
+}
+
+export interface InventoryItemOut {
+  id: number;
+  faculty_id: number;
+  faculty_name: string;
+  sub_unit: string | null;
+  room: string | null;
+  inventory_number: string | null;
+  uzasbo: string | null;
+  inventory_type: string | null;
+  model: string | null;
+  status: string;
+  internet_connection: string | null;
+  responsible_person: string | null;
+  repair_count: number;
+  last_repaired_at: string | null;
+  created_at: string;
+}
+
+export interface RepairHistoryItem {
+  ticket_id: number;
+  ticket_number: string;
+  closed_at: string | null;
+  resolution_comment: string | null;
+  technician_full_name: string | null;
+  is_suspicious: boolean;
+}
+
+export interface InventoryImportSkip {
+  row: number;
+  reason: string;
+}
+
+export interface InventoryImportResult {
+  created: number;
+  skipped: InventoryImportSkip[];
 }
 
 export interface FacultyStat {
@@ -102,7 +157,6 @@ export interface ReporterStat {
 export interface TechnicianStat {
   technician_id: number;
   full_name: string;
-  faculty_id: number | null;
   accepted: number;
   closed: number;
   open_remaining: number;

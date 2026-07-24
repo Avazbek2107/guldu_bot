@@ -17,6 +17,9 @@ class Settings(BaseSettings):
 
     cors_origins: str = "http://localhost:5173"
 
+    cookie_secure: bool = True
+    cookie_samesite: str = "none"
+
     @model_validator(mode="after")
     def _check_production_secret(self) -> "Settings":
         if self.app_env == "production" and self.jwt_secret_key == DEFAULT_JWT_SECRET_KEY:

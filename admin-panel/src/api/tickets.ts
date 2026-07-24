@@ -16,9 +16,14 @@ export async function listTickets(filters?: TicketFilters): Promise<TicketOut[]>
   return data;
 }
 
-export async function closeTicket(id: number, resolutionComment: string | null): Promise<TicketOut> {
+export async function closeTicket(
+  id: number,
+  resolutionComment: string | null,
+  inventoryItemId: number,
+): Promise<TicketOut> {
   const { data } = await apiClient.patch<TicketOut>(`/tickets/${id}/close`, {
     resolution_comment: resolutionComment,
+    inventory_item_id: inventoryItemId,
   });
   return data;
 }
