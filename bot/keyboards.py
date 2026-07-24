@@ -1,10 +1,15 @@
+import math
+
 from aiogram.types import (
+    InlineKeyboardButton,
     InlineKeyboardMarkup,
     KeyboardButton,
     ReplyKeyboardMarkup,
     ReplyKeyboardRemove,
 )
 from aiogram.utils.keyboard import InlineKeyboardBuilder
+
+INVENTORY_PAGE_SIZE = 8
 
 CATEGORY_LABELS = {
     "computer": "🖥 Kompyuter",
@@ -107,6 +112,35 @@ def suspicious_keyboard(ticket_id: int) -> InlineKeyboardMarkup:
     builder.button(text="Yo'q", callback_data=f"suspicious:no:{ticket_id}")
     builder.adjust(2)
     return builder.as_markup()
+
+
+def inventory_browse_keyboard(ticket_id: int) -> InlineKeyboardMarkup:
+    builder = InlineKeyboardBuilder()
+    builder.button(text="📋 Ro'yxatdan tanlash", callback_data=f"invlist:{ticket_id}:0")
+    return builder.as_markup()
+
+
+def inventory_picker_keyboard(items: list, ticket_id: int, page: int, total: int) -> InlineKeyboardMarkup:
+    rows = []
+    for item in items:
+        parts = []
+        if item.room:
+            parts.append(item.room)
+        parts.append(item.inventory_number or item.model or item.inventory_type or f"#{item.id}")
+        label = " · ".join(parts)[:60]
+        rows.append([InlineKeyboardButton(text=label, callback_data=f"invitem:{ticket_id}:{item.id}")])
+
+    total_pages = max(1, math.ceil(total / INVENTORY_PAGE_SIZE))
+    nav_row = []
+    if page > 0:
+        nav_row.append(InlineKeyboardButton(text="◀️", callback_data=f"invpage:{ticket_id}:{page - 1}"))
+    nav_row.append(InlineKeyboardButton(text=f"{page + 1}/{total_pages}", callback_data="noop"))
+    if page < total_pages - 1:
+        nav_row.append(InlineKeyboardButton(text="▶️", callback_data=f"invpage:{ticket_id}:{page + 1}"))
+    if len(nav_row) > 1:
+        rows.append(nav_row)
+
+    return InlineKeyboardMarkup(inline_keyboard=rows)
 
 
 def technician_choice_keyboard(technicians: list, ticket_id: int) -> InlineKeyboardMarkup:

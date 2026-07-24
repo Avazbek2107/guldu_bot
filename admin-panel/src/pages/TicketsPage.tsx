@@ -291,7 +291,7 @@ export function TicketsPage() {
             value={closeInventoryId}
             onChange={setCloseInventoryId}
             filterOption={(input, option) =>
-              (option?.label as string).toLowerCase().includes(input.toLowerCase())
+              (option?.label as string | undefined)?.toLowerCase().includes(input.toLowerCase()) ?? false
             }
             options={closeInventoryOptions.map((item) => ({
               value: item.id,

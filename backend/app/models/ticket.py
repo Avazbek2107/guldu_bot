@@ -48,9 +48,7 @@ class Ticket(Base, TimestampMixin):
 
     accepted_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     closed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
-    sla_deadline: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     escalated_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
-    sla_breach_notified_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
 
     created_by: Mapped["User"] = relationship(back_populates="tickets_created", foreign_keys=[created_by_user_id])
     assigned_technician: Mapped["User | None"] = relationship(
@@ -63,7 +61,6 @@ class Ticket(Base, TimestampMixin):
     reassignments: Mapped[list["TicketReassignment"]] = relationship(
         back_populates="ticket", cascade="all, delete-orphan"
     )
-    rating: Mapped["Rating | None"] = relationship(back_populates="ticket", cascade="all, delete-orphan")
 
 
 class TicketAttachment(Base):

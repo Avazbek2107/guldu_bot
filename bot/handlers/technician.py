@@ -13,8 +13,15 @@ from app.models.ticket import Ticket
 from app.models.user import User
 from app.services.pdf_generator import generate_ticket_pdf
 
-from bot.keyboards import suspicious_keyboard, technician_choice_keyboard, ticket_actions_keyboard
-from bot.services.inventory import count_repairs, find_inventory_item
+from bot.keyboards import (
+    INVENTORY_PAGE_SIZE,
+    inventory_browse_keyboard,
+    inventory_picker_keyboard,
+    suspicious_keyboard,
+    technician_choice_keyboard,
+    ticket_actions_keyboard,
+)
+from bot.services.inventory import count_repairs, find_inventory_item, list_inventory_page
 from bot.services.tickets import (
     accept_ticket,
     can_close_ticket,
@@ -81,7 +88,10 @@ async def handle_close_start(callback: CallbackQuery, state: FSMContext) -> None
 
     await state.update_data(ticket_id=ticket_id)
     await state.set_state(CloseTicket.waiting_inventory_number)
-    await callback.message.answer("Ta'mirlangan qurilmaning inventar raqamini kiriting:")
+    await callback.message.answer(
+        "Ta'mirlangan qurilmaning inventar raqamini kiriting, yoki ro'yxatdan tanlang:",
+        reply_markup=inventory_browse_keyboard(ticket_id),
+    )
     await callback.answer()
 
 
@@ -101,13 +111,81 @@ async def handle_close_inventory_number(message: Message, state: FSMContext) -> 
     if item is None:
         await message.answer(
             "Bu raqam bilan inventar topilmadi. Iltimos, raqamni tekshirib qayta kiriting "
-            "(yoki avval admin panelda ro'yxatdan o'tkazing)."
+            "yoki ro'yxatdan tanlang:",
+            reply_markup=inventory_browse_keyboard(data["ticket_id"]),
         )
         return
 
     await state.update_data(inventory_item_id=item.id)
     await state.set_state(CloseTicket.waiting_comment)
     await message.answer("Yechim izohini yozing (yoki '-' yuboring):")
+
+
+async def _render_inventory_page(message: Message, ticket_id: int, page: int, edit: bool) -> None:
+    async with async_session_factory() as db:
+        ticket = await _get_ticket(db, ticket_id)
+        if ticket is None:
+            return
+        items, total = await list_inventory_page(
+            db, ticket.faculty_id, page * INVENTORY_PAGE_SIZE, INVENTORY_PAGE_SIZE
+        )
+
+    if not items:
+        text = "Bu yo'nalishda hali inventar ro'yxatga olinmagan. Iltimos, raqamni qo'lda kiriting yoki admin panelda qo'shing."
+        keyboard = None
+    else:
+        text = "Qurilmani tanlang:"
+        keyboard = inventory_picker_keyboard(items, ticket_id, page, total)
+
+    if edit:
+        await message.edit_text(text, reply_markup=keyboard)
+    else:
+        await message.answer(text, reply_markup=keyboard)
+
+
+@router.callback_query(F.data.startswith("invlist:"))
+async def handle_inventory_list(callback: CallbackQuery, state: FSMContext) -> None:
+    _, ticket_id_str, page_str = callback.data.split(":")
+    ticket_id = int(ticket_id_str)
+    data = await state.get_data()
+    if data.get("ticket_id") != ticket_id:
+        await callback.answer("Amal muddati tugagan, qaytadan boshlang", show_alert=True)
+        return
+    await _render_inventory_page(callback.message, ticket_id, int(page_str), edit=False)
+    await callback.answer()
+
+
+@router.callback_query(F.data.startswith("invpage:"))
+async def handle_inventory_page(callback: CallbackQuery, state: FSMContext) -> None:
+    _, ticket_id_str, page_str = callback.data.split(":")
+    ticket_id = int(ticket_id_str)
+    data = await state.get_data()
+    if data.get("ticket_id") != ticket_id:
+        await callback.answer("Amal muddati tugagan, qaytadan boshlang", show_alert=True)
+        return
+    await _render_inventory_page(callback.message, ticket_id, int(page_str), edit=True)
+    await callback.answer()
+
+
+@router.callback_query(F.data.startswith("invitem:"))
+async def handle_inventory_item_choice(callback: CallbackQuery, state: FSMContext) -> None:
+    _, ticket_id_str, item_id_str = callback.data.split(":")
+    ticket_id = int(ticket_id_str)
+    data = await state.get_data()
+    if data.get("ticket_id") != ticket_id:
+        await callback.answer("Amal muddati tugagan, qaytadan boshlang", show_alert=True)
+        return
+
+    await state.update_data(inventory_item_id=int(item_id_str))
+    await state.set_state(CloseTicket.waiting_comment)
+    await callback.message.edit_reply_markup(reply_markup=None)
+    await callback.message.answer("Yechim izohini yozing (yoki '-' yuboring):")
+    await callback.answer()
+
+
+@router.callback_query(F.data == "noop")
+async def handle_noop_callback(callback: CallbackQuery) -> None:
+    await callback.answer()
 
 
 @router.message(StateFilter(CloseTicket.waiting_comment))

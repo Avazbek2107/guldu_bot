@@ -19,6 +19,26 @@ async def find_inventory_item(db: AsyncSession, faculty_id: int, inventory_numbe
     return result.scalars().first()
 
 
+async def list_inventory_page(
+    db: AsyncSession, faculty_id: int, offset: int, limit: int
+) -> tuple[list[InventoryItem], int]:
+    total = (
+        await db.execute(
+            select(func.count()).select_from(InventoryItem).where(InventoryItem.faculty_id == faculty_id)
+        )
+    ).scalar_one()
+    rows = (
+        await db.execute(
+            select(InventoryItem)
+            .where(InventoryItem.faculty_id == faculty_id)
+            .order_by(InventoryItem.room, InventoryItem.inventory_number)
+            .offset(offset)
+            .limit(limit)
+        )
+    ).scalars().all()
+    return list(rows), total
+
+
 async def count_repairs(db: AsyncSession, inventory_item_id: int) -> int:
     result = await db.execute(
         select(func.count()).select_from(Ticket).where(
