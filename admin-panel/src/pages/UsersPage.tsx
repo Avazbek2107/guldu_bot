@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
-import { Button, Form, Input, InputNumber, Modal, Popconfirm, Select, Space, Table, Tag, message } from "antd";
+import { Button, Form, Input, InputNumber, Modal, Select, Space, Table, Tag, message } from "antd";
 import { MinusCircleOutlined, PlusOutlined } from "@ant-design/icons";
+import { ActionsMenu } from "../components/ActionsMenu";
 import {
   blockUser,
   createUser,
@@ -245,7 +246,7 @@ export function UsersPage() {
               const assignments = record.faculty_assignments ?? [];
               if (assignments.length === 0) return "-";
               return (
-                <Space direction="vertical" size={4}>
+                <Space orientation="vertical" size={4}>
                   {assignments.map((a) => (
                     <Tag key={a.faculty_id} color={a.role === "technician_main" ? "gold" : "default"}>
                       {a.faculty_name} — {a.role === "technician_main" ? "asosiy" : "zaxira"}
@@ -259,7 +260,7 @@ export function UsersPage() {
             title: "Telegram",
             dataIndex: "telegram_id",
             render: (v: number | null) =>
-              v != null ? <Tag color="blue">Bog'langan ({v})</Tag> : <Tag>Bog'lanmagan</Tag>,
+              v != null ? <Tag color="green">Bog'langan ({v})</Tag> : <Tag>Bog'lanmagan</Tag>,
           },
           {
             title: "Holat",
@@ -275,34 +276,41 @@ export function UsersPage() {
           {
             title: "Amallar",
             key: "actions",
+            fixed: "right",
+            width: 72,
             render: (_: unknown, record: UserOut) => (
-              <Space>
-                <Button
-                  size="small"
-                  onClick={() => {
-                    setEditTarget(record);
-                    editForm.setFieldsValue({
-                      full_name: record.full_name,
-                      phone: record.phone,
-                      telegram_id: record.telegram_id ?? undefined,
-                      faculty_assignments: (record.faculty_assignments ?? []).map((a) => ({
-                        faculty_id: a.faculty_id,
-                        role: a.role,
-                      })),
-                    });
-                  }}
-                >
-                  Tahrirlash
-                </Button>
-                <Button size="small" onClick={() => handleToggleBlock(record)}>
-                  {record.is_blocked ? "Blokdan chiqarish" : "Bloklash"}
-                </Button>
-                <Popconfirm title="O'chirishni tasdiqlaysizmi?" onConfirm={() => handleDelete(record)}>
-                  <Button size="small" danger>
-                    O'chirish
-                  </Button>
-                </Popconfirm>
-              </Space>
+              <ActionsMenu
+                items={[
+                  {
+                    key: "edit",
+                    label: "Tahrirlash",
+                    onClick: () => {
+                      setEditTarget(record);
+                      editForm.setFieldsValue({
+                        full_name: record.full_name,
+                        phone: record.phone,
+                        telegram_id: record.telegram_id ?? undefined,
+                        faculty_assignments: (record.faculty_assignments ?? []).map((a) => ({
+                          faculty_id: a.faculty_id,
+                          role: a.role,
+                        })),
+                      });
+                    },
+                  },
+                  {
+                    key: "block",
+                    label: record.is_blocked ? "Blokdan chiqarish" : "Bloklash",
+                    onClick: () => handleToggleBlock(record),
+                  },
+                  {
+                    key: "delete",
+                    label: "O'chirish",
+                    danger: true,
+                    confirmTitle: "O'chirishni tasdiqlaysizmi?",
+                    onClick: () => handleDelete(record),
+                  },
+                ]}
+              />
             ),
           },
         ]}

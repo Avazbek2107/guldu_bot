@@ -16,6 +16,7 @@ import { closeTicket, exportTickets, listTickets, reassignTicket, type TicketFil
 import { listFaculties } from "../api/faculties";
 import { listInventory } from "../api/inventory";
 import { listUsers } from "../api/users";
+import { ActionsMenu, type ActionItem } from "../components/ActionsMenu";
 import { useAuth } from "../auth/AuthContext";
 import {
   CATEGORY_LABELS_UZ,
@@ -235,28 +236,30 @@ export function TicketsPage() {
           {
             title: "Amallar",
             key: "actions",
-            render: (_: unknown, record: TicketOut) => (
-              <Space>
-                <Tooltip title="Ma'lumotnomani yuklab olish">
-                  <Button
-                    size="small"
-                    icon={<FilePdfOutlined />}
-                    loading={pdfLoadingId === record.id}
-                    onClick={() => handlePdfDownload(record)}
-                  />
-                </Tooltip>
-                {record.status !== "closed" && (
-                  <>
-                    <Button size="small" onClick={() => openCloseModal(record)}>
-                      Yopish
-                    </Button>
-                    <Button size="small" onClick={() => setReassignTarget(record)}>
-                      Qayta yo'naltirish
-                    </Button>
-                  </>
-                )}
-              </Space>
-            ),
+            fixed: "right",
+            width: 96,
+            render: (_: unknown, record: TicketOut) => {
+              const menuItems: ActionItem[] =
+                record.status !== "closed"
+                  ? [
+                      { key: "close", label: "Yopish", onClick: () => openCloseModal(record) },
+                      { key: "reassign", label: "Qayta yo'naltirish", onClick: () => setReassignTarget(record) },
+                    ]
+                  : [];
+              return (
+                <Space size={4}>
+                  <Tooltip title="Ma'lumotnomani yuklab olish">
+                    <Button
+                      size="small"
+                      icon={<FilePdfOutlined />}
+                      loading={pdfLoadingId === record.id}
+                      onClick={() => handlePdfDownload(record)}
+                    />
+                  </Tooltip>
+                  {menuItems.length > 0 && <ActionsMenu items={menuItems} />}
+                </Space>
+              );
+            },
           },
         ]}
       />

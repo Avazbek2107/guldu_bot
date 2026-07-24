@@ -4,7 +4,6 @@ import {
   Form,
   Input,
   Modal,
-  Popconfirm,
   Select,
   Space,
   Table,
@@ -24,6 +23,7 @@ import {
   type InventoryItemPayload,
 } from "../api/inventory";
 import { listFaculties } from "../api/faculties";
+import { ActionsMenu } from "../components/ActionsMenu";
 import { orgUnitLabel, type FacultyOut, type InventoryItemOut, type RepairHistoryItem } from "../types";
 
 const STATUS_OPTIONS = [
@@ -225,37 +225,45 @@ export function InventoryPage() {
           {
             title: "Amallar",
             key: "actions",
+            fixed: "right",
+            width: 72,
             render: (_: unknown, record: InventoryItemOut) => (
-              <Space>
-                <Button size="small" icon={<HistoryOutlined />} onClick={() => openHistory(record)}>
-                  Tarix
-                </Button>
-                <Button
-                  size="small"
-                  onClick={() => {
-                    setEditTarget(record);
-                    editForm.setFieldsValue({
-                      faculty_id: record.faculty_id,
-                      sub_unit: record.sub_unit ?? undefined,
-                      room: record.room ?? undefined,
-                      inventory_number: record.inventory_number ?? undefined,
-                      uzasbo: record.uzasbo ?? undefined,
-                      inventory_type: record.inventory_type ?? undefined,
-                      model: record.model ?? undefined,
-                      status: record.status,
-                      internet_connection: record.internet_connection ?? undefined,
-                      responsible_person: record.responsible_person ?? undefined,
-                    });
-                  }}
-                >
-                  Tahrirlash
-                </Button>
-                <Popconfirm title="O'chirishni tasdiqlaysizmi?" onConfirm={() => handleDelete(record)}>
-                  <Button size="small" danger>
-                    O'chirish
-                  </Button>
-                </Popconfirm>
-              </Space>
+              <ActionsMenu
+                items={[
+                  {
+                    key: "history",
+                    label: "Tarix",
+                    icon: <HistoryOutlined />,
+                    onClick: () => openHistory(record),
+                  },
+                  {
+                    key: "edit",
+                    label: "Tahrirlash",
+                    onClick: () => {
+                      setEditTarget(record);
+                      editForm.setFieldsValue({
+                        faculty_id: record.faculty_id,
+                        sub_unit: record.sub_unit ?? undefined,
+                        room: record.room ?? undefined,
+                        inventory_number: record.inventory_number ?? undefined,
+                        uzasbo: record.uzasbo ?? undefined,
+                        inventory_type: record.inventory_type ?? undefined,
+                        model: record.model ?? undefined,
+                        status: record.status,
+                        internet_connection: record.internet_connection ?? undefined,
+                        responsible_person: record.responsible_person ?? undefined,
+                      });
+                    },
+                  },
+                  {
+                    key: "delete",
+                    label: "O'chirish",
+                    danger: true,
+                    confirmTitle: "O'chirishni tasdiqlaysizmi?",
+                    onClick: () => handleDelete(record),
+                  },
+                ]}
+              />
             ),
           },
         ]}

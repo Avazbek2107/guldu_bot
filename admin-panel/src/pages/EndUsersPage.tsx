@@ -1,7 +1,8 @@
 import { useEffect, useState } from "react";
-import { Button, Form, Input, InputNumber, Modal, Popconfirm, Select, Space, Table, Tag, message } from "antd";
+import { Form, Input, InputNumber, Modal, Select, Space, Table, Tag, message } from "antd";
 import { blockUser, deleteUser, listUsers, unblockUser, updateUser } from "../api/users";
 import { listFaculties } from "../api/faculties";
+import { ActionsMenu } from "../components/ActionsMenu";
 import { orgUnitLabel, type FacultyOut, type UserOut } from "../types";
 
 export function EndUsersPage() {
@@ -105,7 +106,7 @@ export function EndUsersPage() {
             title: "Telegram",
             dataIndex: "telegram_id",
             render: (v: number | null) =>
-              v != null ? <Tag color="blue">Bog'langan</Tag> : <Tag>Bog'lanmagan</Tag>,
+              v != null ? <Tag color="green">Bog'langan</Tag> : <Tag>Bog'lanmagan</Tag>,
           },
           {
             title: "Holat",
@@ -121,31 +122,38 @@ export function EndUsersPage() {
           {
             title: "Amallar",
             key: "actions",
+            fixed: "right",
+            width: 72,
             render: (_: unknown, record: UserOut) => (
-              <Space>
-                <Button
-                  size="small"
-                  onClick={() => {
-                    setEditTarget(record);
-                    editForm.setFieldsValue({
-                      full_name: record.full_name,
-                      phone: record.phone,
-                      faculty_id: record.faculty_id ?? undefined,
-                      telegram_id: record.telegram_id ?? undefined,
-                    });
-                  }}
-                >
-                  Tahrirlash
-                </Button>
-                <Button size="small" onClick={() => handleToggleBlock(record)}>
-                  {record.is_blocked ? "Blokdan chiqarish" : "Bloklash"}
-                </Button>
-                <Popconfirm title="O'chirishni tasdiqlaysizmi?" onConfirm={() => handleDelete(record)}>
-                  <Button size="small" danger>
-                    O'chirish
-                  </Button>
-                </Popconfirm>
-              </Space>
+              <ActionsMenu
+                items={[
+                  {
+                    key: "edit",
+                    label: "Tahrirlash",
+                    onClick: () => {
+                      setEditTarget(record);
+                      editForm.setFieldsValue({
+                        full_name: record.full_name,
+                        phone: record.phone,
+                        faculty_id: record.faculty_id ?? undefined,
+                        telegram_id: record.telegram_id ?? undefined,
+                      });
+                    },
+                  },
+                  {
+                    key: "block",
+                    label: record.is_blocked ? "Blokdan chiqarish" : "Bloklash",
+                    onClick: () => handleToggleBlock(record),
+                  },
+                  {
+                    key: "delete",
+                    label: "O'chirish",
+                    danger: true,
+                    confirmTitle: "O'chirishni tasdiqlaysizmi?",
+                    onClick: () => handleDelete(record),
+                  },
+                ]}
+              />
             ),
           },
         ]}
