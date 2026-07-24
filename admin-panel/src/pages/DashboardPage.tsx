@@ -43,6 +43,20 @@ const STATUS_COLORS: Record<string, string> = {
   Yopilgan: GREEN,
 };
 
+const INVENTORY_STATUS_LABELS: Record<string, string> = {
+  ishchi: "Ishchi",
+  nosoz: "Nosoz",
+  "ta'mirlanmoqda": "Ta'mirlanmoqda",
+  "hisobdan chiqarilgan": "Hisobdan chiqarilgan",
+};
+
+const INVENTORY_STATUS_COLORS: Record<string, string> = {
+  Ishchi: GREEN,
+  Nosoz: RED,
+  "Ta'mirlanmoqda": YELLOW,
+  "Hisobdan chiqarilgan": INK_MUTED,
+};
+
 interface TooltipPayloadItem {
   name?: string;
   value?: number | string;
@@ -124,6 +138,11 @@ export function DashboardPage() {
       count: c.count,
     }))
     .sort((a, b) => b.count - a.count);
+
+  const inventoryStatusData = stats.inventory_status_stats.map((s) => ({
+    name: INVENTORY_STATUS_LABELS[s.status] ?? s.status,
+    value: s.count,
+  }));
 
   return (
     <div>
@@ -371,6 +390,92 @@ export function DashboardPage() {
                   title: "Oxirgi ariza",
                   dataIndex: "last_ticket_at",
                   render: (v: string | null) => (v ? new Date(v).toLocaleDateString("uz-UZ") : "-"),
+                },
+              ]}
+            />
+          </Card>
+        </Col>
+      </Row>
+
+      <Row gutter={[16, 16]} style={{ marginTop: 16 }}>
+        <Col xs={24} lg={8}>
+          <Card title="Inventar holati bo'yicha taqsimot">
+            <div style={{ position: "relative" }}>
+              <ResponsiveContainer width="100%" height={260}>
+                <PieChart>
+                  <Pie
+                    data={inventoryStatusData}
+                    dataKey="value"
+                    nameKey="name"
+                    innerRadius={64}
+                    outerRadius={90}
+                    paddingAngle={2}
+                    cornerRadius={4}
+                    stroke={SURFACE}
+                    strokeWidth={2}
+                  >
+                    {inventoryStatusData.map((entry) => (
+                      <Cell key={entry.name} fill={INVENTORY_STATUS_COLORS[entry.name] ?? INK_MUTED} />
+                    ))}
+                  </Pie>
+                  <Tooltip content={<ChartTooltip />} />
+                  <Legend
+                    verticalAlign="bottom"
+                    height={48}
+                    iconType="circle"
+                    iconSize={8}
+                    formatter={(value) => <span style={{ color: INK_SECONDARY }}>{value}</span>}
+                  />
+                </PieChart>
+              </ResponsiveContainer>
+              <div
+                style={{
+                  position: "absolute",
+                  top: "42%",
+                  left: "50%",
+                  transform: "translate(-50%, -50%)",
+                  textAlign: "center",
+                  pointerEvents: "none",
+                }}
+              >
+                <div style={{ fontSize: 24, fontWeight: 600, color: INK_PRIMARY, lineHeight: 1.1 }}>
+                  {stats.total_inventory_items}
+                </div>
+                <div style={{ fontSize: 12, color: INK_MUTED }}>jami</div>
+              </div>
+            </div>
+          </Card>
+        </Col>
+        <Col xs={24} lg={16}>
+          <Card title="Inventar hisoboti — yo'nalishlar kesimida">
+            <Table
+              size="small"
+              rowKey="faculty_id"
+              pagination={false}
+              scroll={{ x: "max-content", y: 260 }}
+              dataSource={stats.inventory_faculty_stats}
+              columns={[
+                { title: "Yo'nalish", dataIndex: "faculty_name" },
+                { title: "Jami", dataIndex: "total", defaultSortOrder: "descend", sorter: (a: { total: number }, b: { total: number }) => a.total - b.total },
+                {
+                  title: "Ishchi",
+                  dataIndex: "working",
+                  render: (v: number) => (v > 0 ? <Tag color={GREEN}>{v}</Tag> : v),
+                },
+                {
+                  title: "Nosoz",
+                  dataIndex: "broken",
+                  render: (v: number) => (v > 0 ? <Tag color={RED}>{v}</Tag> : v),
+                },
+                {
+                  title: "Ta'mirlanmoqda",
+                  dataIndex: "in_repair",
+                  render: (v: number) => (v > 0 ? <Tag color={YELLOW}>{v}</Tag> : v),
+                },
+                {
+                  title: "Hisobdan chiqarilgan",
+                  dataIndex: "decommissioned",
+                  render: (v: number) => (v > 0 ? <Tag color={INK_MUTED}>{v}</Tag> : v),
                 },
               ]}
             />

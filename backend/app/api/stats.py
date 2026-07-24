@@ -9,14 +9,29 @@ from app.api.deps import require_roles
 from app.core.database import get_db
 from app.models.enums import TicketStatus, UserRole
 from app.models.faculty import Faculty
+from app.models.inventory_item import InventoryItem
 from app.models.ticket import Ticket
 from app.models.user import User
-from app.schemas.stats import CategoryStat, DailyCount, DashboardStats, FacultyStat, ReporterStat, TechnicianStat
+from app.schemas.stats import (
+    CategoryStat,
+    DailyCount,
+    DashboardStats,
+    FacultyStat,
+    InventoryFacultyStat,
+    InventoryStatusStat,
+    ReporterStat,
+    TechnicianStat,
+)
 
 router = APIRouter(prefix="/stats", tags=["stats"])
 
 TREND_DAYS = 30
 TOP_REPORTERS_LIMIT = 15
+
+INVENTORY_STATUS_WORKING = "ishchi"
+INVENTORY_STATUS_BROKEN = "nosoz"
+INVENTORY_STATUS_IN_REPAIR = "ta'mirlanmoqda"
+INVENTORY_STATUS_DECOMMISSIONED = "hisobdan chiqarilgan"
 
 
 @router.get("/dashboard", response_model=DashboardStats, dependencies=[Depends(require_roles(UserRole.SUPER_ADMIN))])
@@ -154,6 +169,36 @@ async def get_dashboard_stats(db: AsyncSession = Depends(get_db)):
         day = (now - timedelta(days=offset)).date().isoformat()
         daily_trend.append(DailyCount(date=day, count=day_counts.get(day, 0)))
 
+    inventory_status_rows = (
+        await db.execute(select(InventoryItem.status, func.count()).group_by(InventoryItem.status))
+    ).all()
+    total_inventory_items = sum(count for _, count in inventory_status_rows)
+    inventory_status_stats = [InventoryStatusStat(status=st, count=count) for st, count in inventory_status_rows]
+
+    inventory_faculty_rows = (
+        await db.execute(
+            select(InventoryItem.faculty_id, InventoryItem.status, func.count()).group_by(
+                InventoryItem.faculty_id, InventoryItem.status
+            )
+        )
+    ).all()
+    inventory_faculty_counts: dict[int, dict[str, int]] = defaultdict(dict)
+    for faculty_id, item_status, count in inventory_faculty_rows:
+        inventory_faculty_counts[faculty_id][item_status] = count
+
+    inventory_faculty_stats = [
+        InventoryFacultyStat(
+            faculty_id=f.id,
+            faculty_name=f.name,
+            total=sum(inventory_faculty_counts.get(f.id, {}).values()),
+            working=inventory_faculty_counts.get(f.id, {}).get(INVENTORY_STATUS_WORKING, 0),
+            broken=inventory_faculty_counts.get(f.id, {}).get(INVENTORY_STATUS_BROKEN, 0),
+            in_repair=inventory_faculty_counts.get(f.id, {}).get(INVENTORY_STATUS_IN_REPAIR, 0),
+            decommissioned=inventory_faculty_counts.get(f.id, {}).get(INVENTORY_STATUS_DECOMMISSIONED, 0),
+        )
+        for f in faculties
+    ]
+
     return DashboardStats(
         total_tickets=total_tickets,
         open_tickets=open_tickets,
@@ -166,4 +211,7 @@ async def get_dashboard_stats(db: AsyncSession = Depends(get_db)):
         suspicious_user_count=suspicious_user_count,
         blocked_user_count=blocked_user_count,
         daily_trend=daily_trend,
+        total_inventory_items=total_inventory_items,
+        inventory_status_stats=inventory_status_stats,
+        inventory_faculty_stats=inventory_faculty_stats,
     )

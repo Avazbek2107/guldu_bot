@@ -72,6 +72,13 @@ def _clean(value) -> str | None:
     return text or None
 
 
+def _normalize_status(value) -> str:
+    cleaned = _clean(value)
+    if cleaned is None:
+        return "ishchi"
+    return cleaned.lower()
+
+
 def parse_inventory_rows(file_bytes: bytes) -> list[InventoryImportRow]:
     wb = load_workbook(io.BytesIO(file_bytes), read_only=True, data_only=True)
     ws = wb.active
@@ -107,7 +114,7 @@ def parse_inventory_rows(file_bytes: bytes) -> list[InventoryImportRow]:
                 uzasbo=_clean(uzasbo),
                 inventory_type=_clean(inventory_type),
                 model=_clean(model),
-                status=_clean(status) or "ishchi",
+                status=_normalize_status(status),
                 internet_connection=_clean(internet_connection),
                 responsible_person=_clean(responsible_person),
             )

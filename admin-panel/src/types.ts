@@ -174,6 +174,21 @@ export interface DailyCount {
   count: number;
 }
 
+export interface InventoryStatusStat {
+  status: string;
+  count: number;
+}
+
+export interface InventoryFacultyStat {
+  faculty_id: number;
+  faculty_name: string;
+  total: number;
+  working: number;
+  broken: number;
+  in_repair: number;
+  decommissioned: number;
+}
+
 export interface DashboardStats {
   total_tickets: number;
   open_tickets: number;
@@ -186,4 +201,7 @@ export interface DashboardStats {
   suspicious_user_count: number;
   blocked_user_count: number;
   daily_trend: DailyCount[];
+  total_inventory_items: number;
+  inventory_status_stats: InventoryStatusStat[];
+  inventory_faculty_stats: InventoryFacultyStat[];
 }

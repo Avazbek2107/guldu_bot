@@ -44,6 +44,21 @@ class DailyCount(BaseModel):
     count: int
 
 
+class InventoryStatusStat(BaseModel):
+    status: str
+    count: int
+
+
+class InventoryFacultyStat(BaseModel):
+    faculty_id: int
+    faculty_name: str
+    total: int
+    working: int
+    broken: int
+    in_repair: int
+    decommissioned: int
+
+
 class DashboardStats(BaseModel):
     total_tickets: int
     open_tickets: int
@@ -56,3 +71,6 @@ class DashboardStats(BaseModel):
     suspicious_user_count: int
     blocked_user_count: int
     daily_trend: list[DailyCount]
+    total_inventory_items: int
+    inventory_status_stats: list[InventoryStatusStat]
+    inventory_faculty_stats: list[InventoryFacultyStat]
