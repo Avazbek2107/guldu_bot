@@ -1,7 +1,15 @@
 import { useEffect, useState } from "react";
+import type { CSSProperties, ReactNode } from "react";
 import { useNavigate } from "react-router-dom";
 import { Card, Col, Row, Statistic, Spin, Table, Tag } from "antd";
-import { StopOutlined, WarningOutlined } from "@ant-design/icons";
+import {
+  CheckCircleOutlined,
+  ExclamationCircleOutlined,
+  FileTextOutlined,
+  StopOutlined,
+  SyncOutlined,
+  WarningOutlined,
+} from "@ant-design/icons";
 import {
   Area,
   AreaChart,
@@ -56,6 +64,31 @@ const INVENTORY_STATUS_COLORS: Record<string, string> = {
   "Ta'mirlanmoqda": YELLOW,
   "Hisobdan chiqarilgan": INK_MUTED,
 };
+
+const CARD_STYLE: CSSProperties = {
+  borderRadius: 14,
+  boxShadow: "0 2px 10px rgba(11,11,11,0.06)",
+  border: "1px solid rgba(11,11,11,0.06)",
+};
+
+function KpiIcon({ icon, tint }: { icon: ReactNode; tint: string }) {
+  return (
+    <div
+      style={{
+        width: 44,
+        height: 44,
+        borderRadius: 12,
+        background: tint,
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "center",
+        flexShrink: 0,
+      }}
+    >
+      {icon}
+    </div>
+  );
+}
 
 interface TooltipPayloadItem {
   name?: string;
@@ -131,6 +164,16 @@ export function DashboardPage() {
     { name: "Jarayonda", value: stats.in_progress_tickets },
     { name: "Yopilgan", value: stats.closed_tickets },
   ];
+  const totalStatusCount = statusData.reduce((sum, d) => sum + d.value, 0);
+  function statusLegendFormatter(value: string) {
+    const item = statusData.find((d) => d.name === value);
+    const pct = item && totalStatusCount ? Math.round((item.value / totalStatusCount) * 100) : 0;
+    return (
+      <span style={{ color: INK_SECONDARY }}>
+        {value} <strong style={{ color: INK_PRIMARY }}>{pct}%</strong>
+      </span>
+    );
+  }
 
   const categoryData = stats.category_stats
     .map((c) => ({
@@ -143,63 +186,105 @@ export function DashboardPage() {
     name: INVENTORY_STATUS_LABELS[s.status] ?? s.status,
     value: s.count,
   }));
+  const totalInventoryStatusCount = inventoryStatusData.reduce((sum, d) => sum + d.value, 0);
+  function inventoryLegendFormatter(value: string) {
+    const item = inventoryStatusData.find((d) => d.name === value);
+    const pct = item && totalInventoryStatusCount ? Math.round((item.value / totalInventoryStatusCount) * 100) : 0;
+    return (
+      <span style={{ color: INK_SECONDARY }}>
+        {value} <strong style={{ color: INK_PRIMARY }}>{pct}%</strong>
+      </span>
+    );
+  }
 
   return (
     <div>
       <Row gutter={[16, 16]}>
         <Col flex="1 1 180px">
-          <Card hoverable onClick={() => navigate("/tickets")} style={{ background: BLUE, border: "none" }}>
-            <Statistic
-              title={<span style={{ color: "rgba(255,255,255,0.85)" }}>Jami arizalar</span>}
-              value={stats.total_tickets}
-              valueStyle={{ color: "#fff" }}
-            />
+          <Card
+            hoverable
+            onClick={() => navigate("/tickets")}
+            style={{ ...CARD_STYLE, background: BLUE, border: "none" }}
+          >
+            <div style={{ display: "flex", alignItems: "center", gap: 14 }}>
+              <KpiIcon
+                icon={<FileTextOutlined style={{ fontSize: 20, color: "#fff" }} />}
+                tint="rgba(255,255,255,0.18)"
+              />
+              <div>
+                <div style={{ fontSize: 13, color: "rgba(255,255,255,0.85)" }}>Jami arizalar</div>
+                <div style={{ fontSize: 26, fontWeight: 700, color: "#fff", lineHeight: 1.2 }}>
+                  {stats.total_tickets}
+                </div>
+              </div>
+            </div>
           </Card>
         </Col>
         <Col flex="1 1 180px">
           <Card
             hoverable
             onClick={() => navigate("/tickets?status=open")}
-            style={{ background: RED, border: "none" }}
+            style={{ ...CARD_STYLE, background: RED, border: "none" }}
           >
-            <Statistic
-              title={<span style={{ color: "rgba(255,255,255,0.85)" }}>Ochiq</span>}
-              value={stats.open_tickets}
-              valueStyle={{ color: "#fff" }}
-            />
+            <div style={{ display: "flex", alignItems: "center", gap: 14 }}>
+              <KpiIcon
+                icon={<ExclamationCircleOutlined style={{ fontSize: 20, color: "#fff" }} />}
+                tint="rgba(255,255,255,0.18)"
+              />
+              <div>
+                <div style={{ fontSize: 13, color: "rgba(255,255,255,0.85)" }}>Ochiq</div>
+                <div style={{ fontSize: 26, fontWeight: 700, color: "#fff", lineHeight: 1.2 }}>
+                  {stats.open_tickets}
+                </div>
+              </div>
+            </div>
           </Card>
         </Col>
         <Col flex="1 1 180px">
           <Card
             hoverable
             onClick={() => navigate("/tickets?status=in_progress")}
-            style={{ background: YELLOW, border: "none" }}
+            style={{ ...CARD_STYLE, background: YELLOW, border: "none" }}
           >
-            <Statistic
-              title={<span style={{ color: "rgba(11,11,11,0.65)" }}>Jarayonda</span>}
-              value={stats.in_progress_tickets}
-              valueStyle={{ color: INK_PRIMARY }}
-            />
+            <div style={{ display: "flex", alignItems: "center", gap: 14 }}>
+              <KpiIcon
+                icon={<SyncOutlined style={{ fontSize: 20, color: INK_PRIMARY }} />}
+                tint="rgba(11,11,11,0.10)"
+              />
+              <div>
+                <div style={{ fontSize: 13, color: "rgba(11,11,11,0.65)" }}>Jarayonda</div>
+                <div style={{ fontSize: 26, fontWeight: 700, color: INK_PRIMARY, lineHeight: 1.2 }}>
+                  {stats.in_progress_tickets}
+                </div>
+              </div>
+            </div>
           </Card>
         </Col>
         <Col flex="1 1 180px">
           <Card
             hoverable
             onClick={() => navigate("/tickets?status=closed")}
-            style={{ background: GREEN, border: "none" }}
+            style={{ ...CARD_STYLE, background: GREEN, border: "none" }}
           >
-            <Statistic
-              title={<span style={{ color: "rgba(255,255,255,0.85)" }}>Yopilgan</span>}
-              value={stats.closed_tickets}
-              valueStyle={{ color: "#fff" }}
-            />
+            <div style={{ display: "flex", alignItems: "center", gap: 14 }}>
+              <KpiIcon
+                icon={<CheckCircleOutlined style={{ fontSize: 20, color: "#fff" }} />}
+                tint="rgba(255,255,255,0.18)"
+              />
+              <div>
+                <div style={{ fontSize: 13, color: "rgba(255,255,255,0.85)" }}>Yopilgan</div>
+                <div style={{ fontSize: 26, fontWeight: 700, color: "#fff", lineHeight: 1.2 }}>
+                  {stats.closed_tickets}
+                </div>
+              </div>
+            </div>
           </Card>
         </Col>
       </Row>
 
       <Row gutter={[16, 16]} style={{ marginTop: 16 }}>
         <Col xs={24} md={12} lg={8}>
-          <Card title="Holat bo'yicha taqsimot">
+          <Card title="Holat bo'yicha taqsimot" style={CARD_STYLE}>
             <div style={{ position: "relative" }}>
               <ResponsiveContainer width="100%" height={260}>
                 <PieChart>
@@ -224,7 +309,7 @@ export function DashboardPage() {
                     height={36}
                     iconType="circle"
                     iconSize={8}
-                    formatter={(value) => <span style={{ color: INK_SECONDARY }}>{value}</span>}
+                    formatter={statusLegendFormatter}
                   />
                 </PieChart>
               </ResponsiveContainer>
@@ -247,7 +332,7 @@ export function DashboardPage() {
           </Card>
         </Col>
         <Col xs={24} md={12} lg={8}>
-          <Card title="Muammo toifalari">
+          <Card title="Muammo toifalari" style={CARD_STYLE}>
             <ResponsiveContainer width="100%" height={260}>
               <BarChart data={categoryData} layout="vertical" margin={{ left: 8, right: 24 }}>
                 <CartesianGrid horizontal={false} stroke={GRIDLINE} />
@@ -269,7 +354,7 @@ export function DashboardPage() {
           </Card>
         </Col>
         <Col xs={24} lg={8}>
-          <Card title="Vaqt bo'yicha trend (30 kun)">
+          <Card title="Vaqt bo'yicha trend (30 kun)" style={CARD_STYLE}>
             <ResponsiveContainer width="100%" height={260}>
               <AreaChart data={stats.daily_trend} margin={{ left: -12, right: 12 }}>
                 <defs>
@@ -308,7 +393,7 @@ export function DashboardPage() {
 
       <Row gutter={[16, 16]} style={{ marginTop: 16 }}>
         <Col xs={24} lg={12}>
-          <Card title="Fakultetlar kesimida statistika">
+          <Card title="Fakultetlar kesimida statistika" style={CARD_STYLE}>
             <Table
               size="small"
               rowKey="faculty_id"
@@ -318,15 +403,27 @@ export function DashboardPage() {
               columns={[
                 { title: "Fakultet", dataIndex: "faculty_name" },
                 { title: "Jami", dataIndex: "total" },
-                { title: "Ochiq", dataIndex: "open" },
-                { title: "Jarayonda", dataIndex: "in_progress" },
-                { title: "Yopilgan", dataIndex: "closed" },
+                {
+                  title: "Ochiq",
+                  dataIndex: "open",
+                  render: (v: number) => (v > 0 ? <Tag color={RED}>{v}</Tag> : v),
+                },
+                {
+                  title: "Jarayonda",
+                  dataIndex: "in_progress",
+                  render: (v: number) => (v > 0 ? <Tag color={YELLOW}>{v}</Tag> : v),
+                },
+                {
+                  title: "Yopilgan",
+                  dataIndex: "closed",
+                  render: (v: number) => (v > 0 ? <Tag color={GREEN}>{v}</Tag> : v),
+                },
               ]}
             />
           </Card>
         </Col>
         <Col xs={24} lg={12}>
-          <Card title="Xodimlar ish samaradorligi">
+          <Card title="Xodimlar ish samaradorligi" style={CARD_STYLE}>
             <Table
               size="small"
               rowKey="technician_id"
@@ -362,7 +459,7 @@ export function DashboardPage() {
 
       <Row gutter={[16, 16]} style={{ marginTop: 16 }}>
         <Col span={24}>
-          <Card title="Eng ko'p ariza yozgan foydalanuvchilar (kimda doim muammo bor)">
+          <Card title="Eng ko'p ariza yozgan foydalanuvchilar (kimda doim muammo bor)" style={CARD_STYLE}>
             <Table
               size="small"
               rowKey="user_id"
@@ -380,7 +477,11 @@ export function DashboardPage() {
                   sorter: (a: { total_tickets: number }, b: { total_tickets: number }) =>
                     a.total_tickets - b.total_tickets,
                 },
-                { title: "Ochiq", dataIndex: "open_tickets" },
+                {
+                  title: "Ochiq",
+                  dataIndex: "open_tickets",
+                  render: (v: number) => (v > 0 ? <Tag color={RED}>{v}</Tag> : v),
+                },
                 {
                   title: "Shubhali",
                   dataIndex: "suspicious_tickets",
@@ -399,7 +500,7 @@ export function DashboardPage() {
 
       <Row gutter={[16, 16]} style={{ marginTop: 16 }}>
         <Col xs={24} lg={8}>
-          <Card title="Inventar holati bo'yicha taqsimot">
+          <Card title="Inventar holati bo'yicha taqsimot" style={CARD_STYLE}>
             <div style={{ position: "relative" }}>
               <ResponsiveContainer width="100%" height={260}>
                 <PieChart>
@@ -424,7 +525,7 @@ export function DashboardPage() {
                     height={48}
                     iconType="circle"
                     iconSize={8}
-                    formatter={(value) => <span style={{ color: INK_SECONDARY }}>{value}</span>}
+                    formatter={inventoryLegendFormatter}
                   />
                 </PieChart>
               </ResponsiveContainer>
@@ -447,7 +548,7 @@ export function DashboardPage() {
           </Card>
         </Col>
         <Col xs={24} lg={16}>
-          <Card title="Inventar hisoboti — yo'nalishlar kesimida">
+          <Card title="Inventar hisoboti — yo'nalishlar kesimida" style={CARD_STYLE}>
             <Table
               size="small"
               rowKey="faculty_id"
@@ -485,7 +586,7 @@ export function DashboardPage() {
 
       <Row gutter={[16, 16]} style={{ marginTop: 16 }}>
         <Col xs={24} sm={12}>
-          <Card>
+          <Card style={CARD_STYLE}>
             <Statistic
               title={
                 <span>
@@ -499,7 +600,7 @@ export function DashboardPage() {
           </Card>
         </Col>
         <Col xs={24} sm={12}>
-          <Card>
+          <Card style={CARD_STYLE}>
             <Statistic
               title={
                 <span>
