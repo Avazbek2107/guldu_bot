@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
+import { useSearchParams } from "react-router-dom";
 import {
   Button,
   Input,
@@ -40,6 +41,7 @@ const STATUS_COLORS: Record<TicketStatus, string> = {
 export function TicketsPage() {
   const { user } = useAuth();
   const isSuperAdmin = user?.role === "super_admin";
+  const [searchParams] = useSearchParams();
 
   const [tickets, setTickets] = useState<TicketOut[]>([]);
   const [faculties, setFaculties] = useState<FacultyOut[]>([]);
@@ -47,7 +49,9 @@ export function TicketsPage() {
   const [loading, setLoading] = useState(true);
 
   const [facultyFilter, setFacultyFilter] = useState<number | undefined>();
-  const [statusFilter, setStatusFilter] = useState<TicketStatus | undefined>();
+  const [statusFilter, setStatusFilter] = useState<TicketStatus | undefined>(
+    () => (searchParams.get("status") as TicketStatus | null) ?? undefined,
+  );
   const [categoryFilter, setCategoryFilter] = useState<TicketCategory | undefined>();
 
   const [closeTarget, setCloseTarget] = useState<TicketOut | null>(null);

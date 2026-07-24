@@ -21,6 +21,8 @@ TOP_REPORTERS_LIMIT = 15
 
 @router.get("/dashboard", response_model=DashboardStats, dependencies=[Depends(require_roles(UserRole.SUPER_ADMIN))])
 async def get_dashboard_stats(db: AsyncSession = Depends(get_db)):
+    now = datetime.now(timezone.utc)
+
     status_counts = dict(
         (await db.execute(select(Ticket.status, func.count()).group_by(Ticket.status))).all()
     )
@@ -134,8 +136,6 @@ async def get_dashboard_stats(db: AsyncSession = Depends(get_db)):
 
     category_rows = (await db.execute(select(Ticket.category, func.count()).group_by(Ticket.category))).all()
     category_stats = [CategoryStat(category=cat.value, count=count) for cat, count in category_rows]
-
-    now = datetime.now(timezone.utc)
 
     suspicious_user_count = (
         await db.execute(select(func.count()).select_from(User).where(User.is_suspicious.is_(True)))

@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { useNavigate } from "react-router-dom";
 import { Card, Col, Row, Statistic, Spin, Table, Tag } from "antd";
 import { StopOutlined, WarningOutlined } from "@ant-design/icons";
 import {
@@ -22,12 +23,13 @@ import type { DashboardStats } from "../types";
 import { CATEGORY_LABELS_UZ } from "../types";
 
 // Validated categorical slots (dataviz skill palette) — fixed order, never cycled.
-const BLUE = "#2a78d6"; // categorical slot 1 — "Jarayonda"
-const ORANGE = "#eb6834"; // categorical slot 2 — "Ochiq"
-const GREEN = "#008300"; // categorical slot 6 — "Yopilgan"
+const BLUE = "#2a78d6"; // chart accent (trend/category bars)
+const GREEN = "#008300"; // "Yopilgan" status
+const YELLOW = "#fab219"; // "Jarayonda" status
+const RED = "#d03b3b"; // "Ochiq" status
 
-const STATUS_WARNING = "#fab219";
-const STATUS_CRITICAL = "#d03b3b";
+const STATUS_WARNING = YELLOW;
+const STATUS_CRITICAL = RED;
 
 const INK_PRIMARY = "#0b0b0b";
 const INK_SECONDARY = "#52514e";
@@ -36,8 +38,8 @@ const GRIDLINE = "#e1e0d9";
 const SURFACE = "#fcfcfb";
 
 const STATUS_COLORS: Record<string, string> = {
-  Ochiq: ORANGE,
-  Jarayonda: BLUE,
+  Ochiq: RED,
+  Jarayonda: YELLOW,
   Yopilgan: GREEN,
 };
 
@@ -92,6 +94,7 @@ function ChartTooltip({
 }
 
 export function DashboardPage() {
+  const navigate = useNavigate();
   const [stats, setStats] = useState<DashboardStats | null>(null);
   const [loading, setLoading] = useState(true);
 
@@ -125,24 +128,48 @@ export function DashboardPage() {
   return (
     <div>
       <Row gutter={[16, 16]}>
-        <Col xs={12} sm={12} md={6}>
-          <Card>
+        <Col flex="1 1 180px">
+          <Card hoverable onClick={() => navigate("/tickets")}>
             <Statistic title="Jami arizalar" value={stats.total_tickets} valueStyle={{ color: INK_PRIMARY }} />
           </Card>
         </Col>
-        <Col xs={12} sm={12} md={6}>
-          <Card>
-            <Statistic title="Ochiq" value={stats.open_tickets} valueStyle={{ color: ORANGE }} />
+        <Col flex="1 1 180px">
+          <Card
+            hoverable
+            onClick={() => navigate("/tickets?status=open")}
+            style={{ background: RED, border: "none" }}
+          >
+            <Statistic
+              title={<span style={{ color: "rgba(255,255,255,0.85)" }}>Ochiq</span>}
+              value={stats.open_tickets}
+              valueStyle={{ color: "#fff" }}
+            />
           </Card>
         </Col>
-        <Col xs={12} sm={12} md={6}>
-          <Card>
-            <Statistic title="Jarayonda" value={stats.in_progress_tickets} valueStyle={{ color: BLUE }} />
+        <Col flex="1 1 180px">
+          <Card
+            hoverable
+            onClick={() => navigate("/tickets?status=in_progress")}
+            style={{ background: YELLOW, border: "none" }}
+          >
+            <Statistic
+              title={<span style={{ color: "rgba(11,11,11,0.65)" }}>Jarayonda</span>}
+              value={stats.in_progress_tickets}
+              valueStyle={{ color: INK_PRIMARY }}
+            />
           </Card>
         </Col>
-        <Col xs={12} sm={12} md={6}>
-          <Card>
-            <Statistic title="Yopilgan" value={stats.closed_tickets} valueStyle={{ color: GREEN }} />
+        <Col flex="1 1 180px">
+          <Card
+            hoverable
+            onClick={() => navigate("/tickets?status=closed")}
+            style={{ background: GREEN, border: "none" }}
+          >
+            <Statistic
+              title={<span style={{ color: "rgba(255,255,255,0.85)" }}>Yopilgan</span>}
+              value={stats.closed_tickets}
+              valueStyle={{ color: "#fff" }}
+            />
           </Card>
         </Col>
       </Row>
