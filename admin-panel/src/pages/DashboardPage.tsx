@@ -129,8 +129,12 @@ export function DashboardPage() {
     <div>
       <Row gutter={[16, 16]}>
         <Col flex="1 1 180px">
-          <Card hoverable onClick={() => navigate("/tickets")}>
-            <Statistic title="Jami arizalar" value={stats.total_tickets} valueStyle={{ color: INK_PRIMARY }} />
+          <Card hoverable onClick={() => navigate("/tickets")} style={{ background: BLUE, border: "none" }}>
+            <Statistic
+              title={<span style={{ color: "rgba(255,255,255,0.85)" }}>Jami arizalar</span>}
+              value={stats.total_tickets}
+              valueStyle={{ color: "#fff" }}
+            />
           </Card>
         </Col>
         <Col flex="1 1 180px">
