@@ -318,7 +318,13 @@ export function DashboardPage() {
                 {
                   title: "Samaradorlik",
                   dataIndex: "efficiency_percent",
-                  render: (value: number | null) => (value != null ? `${value.toFixed(0)}%` : "-"),
+                  sorter: (a: { efficiency_percent: number | null }, b: { efficiency_percent: number | null }) =>
+                    (a.efficiency_percent ?? -1) - (b.efficiency_percent ?? -1),
+                  render: (value: number | null) => {
+                    if (value == null) return "-";
+                    const color = value <= 50 ? RED : value <= 75 ? YELLOW : GREEN;
+                    return <Tag color={color}>{value.toFixed(0)}%</Tag>;
+                  },
                 },
                 {
                   title: "O'rt. yopish vaqti",
