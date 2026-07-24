@@ -208,6 +208,7 @@ export function InventoryPage() {
           { title: "Kafedra/Bo'lim", dataIndex: "sub_unit", render: (v: string | null) => v ?? "-" },
           { title: "Xona", dataIndex: "room", render: (v: string | null) => v ?? "-" },
           { title: "Inventar №", dataIndex: "inventory_number", render: (v: string | null) => v ?? "-" },
+          { title: "Inventar uzasbo", dataIndex: "uzasbo", render: (v: string | null) => v ?? "-" },
           { title: "Toifasi", dataIndex: "inventory_type", render: (v: string | null) => v ?? "-" },
           { title: "Modeli", dataIndex: "model", render: (v: string | null) => v ?? "-" },
           {
