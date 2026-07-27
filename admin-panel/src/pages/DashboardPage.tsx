@@ -85,6 +85,14 @@ function KpiIcon({ icon, tint }: { icon: ReactNode; tint: string }) {
   );
 }
 
+function CountTag({ value, color }: { value: number; color: string }) {
+  return (
+    <Tag color={value > 0 ? color : "default"} style={value > 0 ? undefined : { opacity: 0.35 }}>
+      {value}
+    </Tag>
+  );
+}
+
 interface TooltipPayloadItem {
   name?: string;
   value?: number | string;
@@ -401,17 +409,17 @@ export function DashboardPage() {
                 {
                   title: "Ochiq",
                   dataIndex: "open",
-                  render: (v: number) => (v > 0 ? <Tag color={RED}>{v}</Tag> : v),
+                  render: (v: number) => <CountTag value={v} color={RED} />,
                 },
                 {
                   title: "Jarayonda",
                   dataIndex: "in_progress",
-                  render: (v: number) => (v > 0 ? <Tag color={YELLOW}>{v}</Tag> : v),
+                  render: (v: number) => <CountTag value={v} color={YELLOW} />,
                 },
                 {
                   title: "Yopilgan",
                   dataIndex: "closed",
-                  render: (v: number) => (v > 0 ? <Tag color={GREEN}>{v}</Tag> : v),
+                  render: (v: number) => <CountTag value={v} color={GREEN} />,
                 },
               ]}
             />
@@ -475,12 +483,12 @@ export function DashboardPage() {
                 {
                   title: "Ochiq",
                   dataIndex: "open_tickets",
-                  render: (v: number) => (v > 0 ? <Tag color={RED}>{v}</Tag> : v),
+                  render: (v: number) => <CountTag value={v} color={RED} />,
                 },
                 {
                   title: "Shubhali",
                   dataIndex: "suspicious_tickets",
-                  render: (v: number) => (v > 0 ? <Tag color="orange">{v}</Tag> : v),
+                  render: (v: number) => <CountTag value={v} color="orange" />,
                 },
                 {
                   title: "Oxirgi ariza",
@@ -556,22 +564,22 @@ export function DashboardPage() {
                 {
                   title: "Ishchi",
                   dataIndex: "working",
-                  render: (v: number) => (v > 0 ? <Tag color={GREEN}>{v}</Tag> : v),
+                  render: (v: number) => <CountTag value={v} color={GREEN} />,
                 },
                 {
                   title: "Nosoz",
                   dataIndex: "broken",
-                  render: (v: number) => (v > 0 ? <Tag color={RED}>{v}</Tag> : v),
+                  render: (v: number) => <CountTag value={v} color={RED} />,
                 },
                 {
                   title: "Ta'mirlanmoqda",
                   dataIndex: "in_repair",
-                  render: (v: number) => (v > 0 ? <Tag color={YELLOW}>{v}</Tag> : v),
+                  render: (v: number) => <CountTag value={v} color={YELLOW} />,
                 },
                 {
                   title: "Hisobdan chiqarilgan",
                   dataIndex: "decommissioned",
-                  render: (v: number) => (v > 0 ? <Tag color={INK_MUTED}>{v}</Tag> : v),
+                  render: (v: number) => <CountTag value={v} color={INK_MUTED} />,
                 },
               ]}
             />
