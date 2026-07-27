@@ -50,6 +50,12 @@ def remove_keyboard() -> ReplyKeyboardRemove:
     return ReplyKeyboardRemove()
 
 
+def profile_edit_keyboard() -> InlineKeyboardMarkup:
+    builder = InlineKeyboardBuilder()
+    builder.button(text="✏️ Fakultet/bo'limni o'zgartirish", callback_data="profile:edit_faculty")
+    return builder.as_markup()
+
+
 def org_unit_type_keyboard(callback_prefix: str = "orgtype") -> InlineKeyboardMarkup:
     builder = InlineKeyboardBuilder()
     builder.button(text="🏛 Fakultet", callback_data=f"{callback_prefix}:faculty")

@@ -14,6 +14,7 @@ from bot.keyboards import (
     main_menu_keyboard,
     org_unit_type_keyboard,
     phone_request_keyboard,
+    profile_edit_keyboard,
     remove_keyboard,
 )
 from bot.services.users import get_user_by_phone, get_user_by_telegram_id
@@ -134,6 +135,7 @@ async def handle_registration_faculty(callback: CallbackQuery, state: FSMContext
 
 
 @router.message(Command("profil"))
+@router.message(F.text == "👤 Profil")
 async def cmd_profile(message: Message, state: FSMContext) -> None:
     async with async_session_factory() as db:
         user = await get_user_by_telegram_id(db, message.from_user.id)
@@ -144,10 +146,24 @@ async def cmd_profile(message: Message, state: FSMContext) -> None:
             await message.answer(f"FISH: {user.full_name}\nTelefon: {user.phone}\nRol: {user.role.value}")
             return
 
-    await state.set_state(ProfileChange.waiting_org_unit_type)
+        faculty = await db.get(Faculty, user.faculty_id) if user.faculty_id else None
+
+    unit_label = "Bo'lim" if faculty is not None and faculty.unit_type == OrgUnitType.DEPARTMENT else "Fakultet"
+    faculty_name = faculty.name if faculty is not None else "belgilanmagan"
     await message.answer(
+        f"👤 Profil\n\nFISH: {user.full_name}\nTelefon: {user.phone}\n{unit_label}: {faculty_name}",
+        reply_markup=profile_edit_keyboard(),
+    )
+
+
+@router.callback_query(F.data == "profile:edit_faculty")
+async def handle_profile_edit_start(callback: CallbackQuery, state: FSMContext) -> None:
+    await callback.message.edit_reply_markup(reply_markup=None)
+    await state.set_state(ProfileChange.waiting_org_unit_type)
+    await callback.message.answer(
         "Yangi fakultet yoki bo'limga tegishli ekaningizni tanlang:", reply_markup=org_unit_type_keyboard()
     )
+    await callback.answer()
 
 
 @router.callback_query(StateFilter(ProfileChange.waiting_org_unit_type), F.data.startswith("orgtype:"))
