@@ -14,6 +14,7 @@ class InventoryItemCreate(BaseModel):
     status: str = Field(default="ishchi", max_length=64)
     internet_connection: str | None = None
     responsible_person: str | None = None
+    assigned_technician_id: int | None = None
 
 
 class InventoryItemUpdate(BaseModel):
@@ -27,6 +28,7 @@ class InventoryItemUpdate(BaseModel):
     status: str | None = Field(default=None, max_length=64)
     internet_connection: str | None = None
     responsible_person: str | None = None
+    assigned_technician_id: int | None = None
 
 
 class InventoryItemOut(BaseModel):
@@ -44,6 +46,8 @@ class InventoryItemOut(BaseModel):
     status: str
     internet_connection: str | None
     responsible_person: str | None
+    assigned_technician_id: int | None
+    assigned_technician_name: str | None
     repair_count: int
     last_repaired_at: datetime | None
     created_at: datetime

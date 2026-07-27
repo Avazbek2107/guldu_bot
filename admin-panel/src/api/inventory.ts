@@ -12,6 +12,7 @@ export interface InventoryItemPayload {
   status?: string;
   internet_connection?: string | null;
   responsible_person?: string | null;
+  assigned_technician_id?: number | null;
 }
 
 export async function listInventory(facultyId?: number): Promise<InventoryItemOut[]> {

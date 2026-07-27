@@ -109,6 +109,8 @@ export interface InventoryItemOut {
   status: string;
   internet_connection: string | null;
   responsible_person: string | null;
+  assigned_technician_id: number | null;
+  assigned_technician_name: string | null;
   repair_count: number;
   last_repaired_at: string | null;
   created_at: string;

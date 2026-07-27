@@ -5,9 +5,10 @@ from sqlalchemy.orm import aliased
 
 from app.api.deps import get_current_user, require_roles, technician_faculty_ids
 from app.core.database import get_db
-from app.models.enums import TicketStatus, UserRole
+from app.models.enums import TechnicianFacultyRole, TicketStatus, UserRole
 from app.models.faculty import Faculty
 from app.models.inventory_item import InventoryItem
+from app.models.technician_faculty_assignment import TechnicianFacultyAssignment
 from app.models.ticket import Ticket
 from app.models.user import User
 from app.schemas.inventory import (
@@ -33,7 +34,23 @@ def _check_access(current_user: User, faculty_id: int) -> None:
     raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Bu amal uchun ruxsatingiz yo'q")
 
 
-def _to_out(item: InventoryItem, faculty_name: str, repair_count: int, last_repaired_at) -> InventoryItemOut:
+async def _lookup_main_technician_id(db: AsyncSession, faculty_id: int) -> int | None:
+    result = await db.execute(
+        select(TechnicianFacultyAssignment.user_id).where(
+            TechnicianFacultyAssignment.faculty_id == faculty_id,
+            TechnicianFacultyAssignment.role == TechnicianFacultyRole.TECHNICIAN_MAIN,
+        )
+    )
+    return result.scalar_one_or_none()
+
+
+def _to_out(
+    item: InventoryItem,
+    faculty_name: str,
+    technician_name: str | None,
+    repair_count: int,
+    last_repaired_at,
+) -> InventoryItemOut:
     return InventoryItemOut(
         id=item.id,
         faculty_id=item.faculty_id,
@@ -47,6 +64,8 @@ def _to_out(item: InventoryItem, faculty_name: str, repair_count: int, last_repa
         status=item.status,
         internet_connection=item.internet_connection,
         responsible_person=item.responsible_person,
+        assigned_technician_id=item.assigned_technician_id,
+        assigned_technician_name=technician_name,
         repair_count=repair_count,
         last_repaired_at=last_repaired_at,
         created_at=item.created_at,
@@ -61,13 +80,22 @@ async def _serialize_one(db: AsyncSession, item: InventoryItem, faculty_name: st
             )
         )
     ).one()
-    return _to_out(item, faculty_name, stats[0] or 0, stats[1])
+    technician_name = None
+    if item.assigned_technician_id is not None:
+        technician = await db.get(User, item.assigned_technician_id)
+        technician_name = technician.full_name if technician is not None else None
+    return _to_out(item, faculty_name, technician_name, stats[0] or 0, stats[1])
 
 
 async def _fetch_inventory(
     db: AsyncSession, current_user: User, faculty_id: int | None
 ) -> list[InventoryItemOut]:
-    query = select(InventoryItem, Faculty.name).join(Faculty, InventoryItem.faculty_id == Faculty.id)
+    technician_alias = aliased(User)
+    query = (
+        select(InventoryItem, Faculty.name, technician_alias.full_name)
+        .join(Faculty, InventoryItem.faculty_id == Faculty.id)
+        .outerjoin(technician_alias, InventoryItem.assigned_technician_id == technician_alias.id)
+    )
 
     if current_user.role == UserRole.SUPER_ADMIN:
         if faculty_id is not None:
@@ -89,7 +117,7 @@ async def _fetch_inventory(
     if not rows:
         return []
 
-    item_ids = [item.id for item, _ in rows]
+    item_ids = [item.id for item, _, _ in rows]
     repair_rows = (
         await db.execute(
             select(Ticket.inventory_item_id, func.count(Ticket.id), func.max(Ticket.closed_at))
@@ -100,8 +128,8 @@ async def _fetch_inventory(
     repair_map = {r[0]: (r[1], r[2]) for r in repair_rows}
 
     return [
-        _to_out(item, faculty_name, *repair_map.get(item.id, (0, None)))
-        for item, faculty_name in rows
+        _to_out(item, faculty_name, technician_name, *repair_map.get(item.id, (0, None)))
+        for item, faculty_name, technician_name in rows
     ]
 
 
@@ -146,6 +174,15 @@ async def import_inventory(file: UploadFile = File(...), db: AsyncSession = Depe
     faculties = (await db.execute(select(Faculty))).scalars().all()
     faculty_by_name = {f.name.strip().lower(): f for f in faculties}
 
+    main_tech_rows = (
+        await db.execute(
+            select(TechnicianFacultyAssignment.faculty_id, TechnicianFacultyAssignment.user_id).where(
+                TechnicianFacultyAssignment.role == TechnicianFacultyRole.TECHNICIAN_MAIN
+            )
+        )
+    ).all()
+    main_technician_by_faculty = {faculty_id: user_id for faculty_id, user_id in main_tech_rows}
+
     created = 0
     skipped: list[InventoryImportSkip] = []
     for row in rows:
@@ -169,6 +206,7 @@ async def import_inventory(file: UploadFile = File(...), db: AsyncSession = Depe
                 status=row.status or "ishchi",
                 internet_connection=row.internet_connection,
                 responsible_person=row.responsible_person,
+                assigned_technician_id=main_technician_by_faculty.get(faculty.id),
             )
         )
         created += 1
@@ -221,7 +259,11 @@ async def create_inventory_item(
     if faculty is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Fakultet/bo'lim topilmadi")
 
-    item = InventoryItem(**payload.model_dump())
+    data = payload.model_dump()
+    if data.get("assigned_technician_id") is None:
+        data["assigned_technician_id"] = await _lookup_main_technician_id(db, payload.faculty_id)
+
+    item = InventoryItem(**data)
     db.add(item)
     await db.commit()
     await db.refresh(item)

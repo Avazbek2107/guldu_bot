@@ -24,9 +24,10 @@ import {
   type InventoryItemPayload,
 } from "../api/inventory";
 import { listFaculties } from "../api/faculties";
+import { listUsers } from "../api/users";
 import { ActionsMenu } from "../components/ActionsMenu";
 import { CARD_STYLE } from "../theme";
-import { orgUnitLabel, type FacultyOut, type InventoryItemOut, type RepairHistoryItem } from "../types";
+import { orgUnitLabel, type FacultyOut, type InventoryItemOut, type RepairHistoryItem, type UserOut } from "../types";
 
 const STATUS_OPTIONS = [
   { value: "ishchi", label: "Ishchi" },
@@ -45,6 +46,7 @@ const STATUS_COLORS: Record<string, string> = {
 export function InventoryPage() {
   const [items, setItems] = useState<InventoryItemOut[]>([]);
   const [faculties, setFaculties] = useState<FacultyOut[]>([]);
+  const [technicians, setTechnicians] = useState<UserOut[]>([]);
   const [loading, setLoading] = useState(true);
   const [facultyFilter, setFacultyFilter] = useState<number | undefined>();
 
@@ -53,6 +55,8 @@ export function InventoryPage() {
   const [createForm] = Form.useForm();
   const [editForm] = Form.useForm();
   const [saving, setSaving] = useState(false);
+  const createFacultyId = Form.useWatch("faculty_id", createForm);
+  const editFacultyId = Form.useWatch("faculty_id", editForm);
 
   const [historyTarget, setHistoryTarget] = useState<InventoryItemOut | null>(null);
   const [history, setHistory] = useState<RepairHistoryItem[]>([]);
@@ -65,9 +69,15 @@ export function InventoryPage() {
   async function loadData() {
     setLoading(true);
     try {
-      const [itemList, facultyList] = await Promise.all([listInventory(facultyFilter), listFaculties()]);
+      const [itemList, facultyList, mainTechs, backupTechs] = await Promise.all([
+        listInventory(facultyFilter),
+        listFaculties(),
+        listUsers({ role: "technician_main" }),
+        listUsers({ role: "technician_backup" }),
+      ]);
       setItems(itemList);
       setFaculties(facultyList);
+      setTechnicians([...mainTechs, ...backupTechs]);
     } finally {
       setLoading(false);
     }
@@ -77,6 +87,20 @@ export function InventoryPage() {
     loadData();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [facultyFilter]);
+
+  function technicianOptionsForFaculty(facultyId: number | undefined) {
+    if (!facultyId) return [];
+    return technicians
+      .map((t) => {
+        const assignment = (t.faculty_assignments ?? []).find((a) => a.faculty_id === facultyId);
+        if (!assignment) return null;
+        return {
+          value: t.id,
+          label: `${t.full_name} (${assignment.role === "technician_main" ? "asosiy" : "zaxira"})`,
+        };
+      })
+      .filter((opt): opt is { value: number; label: string } => opt !== null);
+  }
 
   async function handleCreate(values: InventoryItemPayload) {
     setSaving(true);
@@ -97,7 +121,10 @@ export function InventoryPage() {
     if (!editTarget) return;
     setSaving(true);
     try {
-      await updateInventoryItem(editTarget.id, values);
+      await updateInventoryItem(editTarget.id, {
+        ...values,
+        assigned_technician_id: values.assigned_technician_id ?? null,
+      });
       message.success("Saqlandi");
       setEditTarget(null);
       loadData();
@@ -222,6 +249,11 @@ export function InventoryPage() {
           { title: "Internet", dataIndex: "internet_connection", render: (v: string | null) => v ?? "-" },
           { title: "Mas'ul shaxs", dataIndex: "responsible_person", render: (v: string | null) => v ?? "-" },
           {
+            title: "Texnik xodim",
+            dataIndex: "assigned_technician_name",
+            render: (v: string | null) => v ?? "-",
+          },
+          {
             title: "Ta'mirlangan",
             dataIndex: "repair_count",
             render: (v: number) => (v > 0 ? <Tag color="blue">{v} marta</Tag> : "-"),
@@ -256,6 +288,7 @@ export function InventoryPage() {
                         status: record.status,
                         internet_connection: record.internet_connection ?? undefined,
                         responsible_person: record.responsible_person ?? undefined,
+                        assigned_technician_id: record.assigned_technician_id ?? undefined,
                       });
                     },
                   },
@@ -314,6 +347,15 @@ export function InventoryPage() {
           <Form.Item name="responsible_person" label="Mas'ul shaxs">
             <Input />
           </Form.Item>
+          <Form.Item name="assigned_technician_id" label="Texnik xodim">
+            <Select
+              allowClear
+              showSearch
+              optionFilterProp="label"
+              placeholder="Avtomatik (hudud asosiy texnik xodimi)"
+              options={technicianOptionsForFaculty(createFacultyId)}
+            />
+          </Form.Item>
         </Form>
       </Modal>
 
@@ -356,6 +398,15 @@ export function InventoryPage() {
           </Form.Item>
           <Form.Item name="responsible_person" label="Mas'ul shaxs">
             <Input />
+          </Form.Item>
+          <Form.Item name="assigned_technician_id" label="Texnik xodim">
+            <Select
+              allowClear
+              showSearch
+              optionFilterProp="label"
+              placeholder="Avtomatik (hudud asosiy texnik xodimi)"
+              options={technicianOptionsForFaculty(editFacultyId)}
+            />
           </Form.Item>
         </Form>
       </Modal>
