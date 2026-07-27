@@ -48,7 +48,7 @@ export function AppLayout() {
   const navigate = useNavigate();
   const location = useLocation();
   const screens = useBreakpoint();
-  const isMobile = !screens.md;
+  const isMobile = !screens.lg;
   const [drawerOpen, setDrawerOpen] = useState(false);
 
   const isSuperAdmin = user?.role === "super_admin";
