@@ -133,6 +133,16 @@ export interface InventoryImportResult {
   skipped: InventoryImportSkip[];
 }
 
+export interface FacultyImportSkip {
+  row: number;
+  reason: string;
+}
+
+export interface FacultyImportResult {
+  created: number;
+  skipped: FacultyImportSkip[];
+}
+
 export interface FacultyStat {
   faculty_id: number;
   faculty_name: string;

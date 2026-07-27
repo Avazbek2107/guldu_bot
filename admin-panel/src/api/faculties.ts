@@ -1,5 +1,5 @@
-import { apiClient } from "./client";
-import type { FacultyOut, OrgUnitType } from "../types";
+import { apiClient, downloadBlob } from "./client";
+import type { FacultyImportResult, FacultyOut, OrgUnitType } from "../types";
 
 export async function listFaculties(unitType?: OrgUnitType): Promise<FacultyOut[]> {
   const { data } = await apiClient.get<FacultyOut[]>("/faculties", { params: { unit_type: unitType } });
@@ -13,5 +13,20 @@ export async function createFaculty(name: string, unitType: OrgUnitType = "facul
 
 export async function updateFaculty(id: number, name: string): Promise<FacultyOut> {
   const { data } = await apiClient.patch<FacultyOut>(`/faculties/${id}`, { name });
+  return data;
+}
+
+export async function exportFaculties(unitType: OrgUnitType): Promise<void> {
+  const filename = unitType === "department" ? "bolimlar.xlsx" : "fakultetlar.xlsx";
+  await downloadBlob("/faculties/export", { unit_type: unitType }, filename);
+}
+
+export async function importFaculties(unitType: OrgUnitType, file: File): Promise<FacultyImportResult> {
+  const formData = new FormData();
+  formData.append("file", file);
+  const { data } = await apiClient.post<FacultyImportResult>("/faculties/import", formData, {
+    params: { unit_type: unitType },
+    headers: { "Content-Type": "multipart/form-data" },
+  });
   return data;
 }

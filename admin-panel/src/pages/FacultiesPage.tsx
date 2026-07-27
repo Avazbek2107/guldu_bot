@@ -1,7 +1,7 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState, type ChangeEvent } from "react";
 import { Button, Card, Form, Input, Modal, Space, Table, message } from "antd";
-import { PlusOutlined } from "@ant-design/icons";
-import { createFaculty, listFaculties, updateFaculty } from "../api/faculties";
+import { DownloadOutlined, PlusOutlined, UploadOutlined } from "@ant-design/icons";
+import { createFaculty, exportFaculties, importFaculties, listFaculties, updateFaculty } from "../api/faculties";
 import { listUsers } from "../api/users";
 import { CARD_STYLE } from "../theme";
 import type { FacultyOut, UserOut } from "../types";
@@ -16,6 +16,10 @@ export function FacultiesPage() {
   const [createForm] = Form.useForm();
   const [renameForm] = Form.useForm();
   const [saving, setSaving] = useState(false);
+
+  const [exportLoading, setExportLoading] = useState(false);
+  const [importLoading, setImportLoading] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement | null>(null);
 
   async function loadData() {
     setLoading(true);
@@ -73,11 +77,67 @@ export function FacultiesPage() {
     }
   }
 
+  async function handleExport() {
+    setExportLoading(true);
+    try {
+      await exportFaculties("faculty");
+    } catch {
+      message.error("Eksport qilishda xatolik yuz berdi");
+    } finally {
+      setExportLoading(false);
+    }
+  }
+
+  async function handleImportFile(e: ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    e.target.value = "";
+    if (!file) return;
+    setImportLoading(true);
+    try {
+      const result = await importFaculties("faculty", file);
+      if (result.skipped.length === 0) {
+        message.success(`${result.created} ta fakultet qo'shildi`);
+      } else {
+        Modal.warning({
+          title: `${result.created} ta qo'shildi, ${result.skipped.length} ta qator o'tkazib yuborildi`,
+          content: (
+            <div style={{ maxHeight: 300, overflowY: "auto" }}>
+              {result.skipped.map((s) => (
+                <div key={s.row}>
+                  Qator {s.row}: {s.reason}
+                </div>
+              ))}
+            </div>
+          ),
+          width: 480,
+        });
+      }
+      loadData();
+    } catch {
+      message.error("Import qilishda xatolik yuz berdi");
+    } finally {
+      setImportLoading(false);
+    }
+  }
+
   return (
     <div>
       <Space style={{ marginBottom: 16 }} wrap>
         <Button type="primary" icon={<PlusOutlined />} onClick={() => setCreateOpen(true)}>
           Yangi fakultet
+        </Button>
+        <Button icon={<UploadOutlined />} loading={importLoading} onClick={() => fileInputRef.current?.click()}>
+          Import (Excel)
+        </Button>
+        <input
+          ref={fileInputRef}
+          type="file"
+          accept=".xlsx"
+          style={{ display: "none" }}
+          onChange={handleImportFile}
+        />
+        <Button icon={<DownloadOutlined />} loading={exportLoading} onClick={handleExport}>
+          Export (Excel)
         </Button>
       </Space>
 

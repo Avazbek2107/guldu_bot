@@ -18,3 +18,13 @@ class FacultyOut(BaseModel):
     id: int
     name: str
     unit_type: OrgUnitType
+
+
+class FacultyImportSkip(BaseModel):
+    row: int
+    reason: str
+
+
+class FacultyImportResult(BaseModel):
+    created: int
+    skipped: list[FacultyImportSkip]
