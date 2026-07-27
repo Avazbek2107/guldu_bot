@@ -2,12 +2,33 @@ from typing import TYPE_CHECKING
 
 from pydantic import BaseModel, ConfigDict, Field, model_validator
 
+from app.core.permissions import PERMISSION_ACTIONS, PERMISSION_RESOURCES
 from app.models.enums import TechnicianFacultyRole, UserRole
 
 if TYPE_CHECKING:
     from app.models.user import User
 
 TECHNICIAN_ROLES = (UserRole.TECHNICIAN_MAIN, UserRole.TECHNICIAN_BACKUP)
+
+
+def validate_permissions(role: UserRole, permissions: dict[str, list[str]] | None) -> dict[str, list[str]] | None:
+    if role != UserRole.ADMIN:
+        if permissions:
+            raise ValueError("Faqat Admin roli uchun ruxsatlar belgilanadi")
+        return None
+
+    if not permissions:
+        return {}
+
+    cleaned: dict[str, list[str]] = {}
+    for resource, actions in permissions.items():
+        if resource not in PERMISSION_RESOURCES:
+            raise ValueError(f"Noto'g'ri bo'lim: '{resource}'")
+        invalid = [a for a in actions if a not in PERMISSION_ACTIONS]
+        if invalid:
+            raise ValueError(f"Noto'g'ri amal: '{', '.join(invalid)}'")
+        cleaned[resource] = list(dict.fromkeys(actions))
+    return cleaned
 
 
 class FacultyAssignmentIn(BaseModel):
@@ -50,11 +71,13 @@ class UserCreate(BaseModel):
     phone: str = Field(min_length=5, max_length=32)
     role: UserRole
     faculty_assignments: list[FacultyAssignmentIn] = []
+    permissions: dict[str, list[str]] | None = None
     telegram_id: int | None = None
 
     @model_validator(mode="after")
     def _check_assignments(self) -> "UserCreate":
         validate_faculty_assignments(self.role, self.faculty_assignments)
+        self.permissions = validate_permissions(self.role, self.permissions)
         return self
 
 
@@ -63,6 +86,7 @@ class UserUpdate(BaseModel):
     phone: str | None = Field(default=None, min_length=5, max_length=32)
     faculty_id: int | None = None
     faculty_assignments: list[FacultyAssignmentIn] | None = None
+    permissions: dict[str, list[str]] | None = None
     password: str | None = Field(default=None, min_length=8, max_length=100)
     telegram_id: int | None = None
 
@@ -77,6 +101,8 @@ class UserOut(BaseModel):
     role: UserRole
     faculty_id: int | None
     faculty_assignments: list[FacultyAssignmentOut] = []
+    permissions: dict[str, list[str]] | None = None
+    avatar_url: str | None = None
     telegram_id: int | None
     is_blocked: bool
     is_suspicious: bool
@@ -102,6 +128,8 @@ def serialize_user(user: "User", visible_faculty_ids: set[int] | None = None) ->
             FacultyAssignmentOut(faculty_id=a.faculty_id, faculty_name=a.faculty.name, role=a.role)
             for a in assignments
         ],
+        permissions=user.permissions,
+        avatar_url=f"/storage/{user.avatar_path}" if user.avatar_path else None,
         telegram_id=user.telegram_id,
         is_blocked=user.is_blocked,
         is_suspicious=user.is_suspicious,

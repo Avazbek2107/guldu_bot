@@ -1,10 +1,12 @@
 import { apiClient } from "./client";
-import type { TechnicianRole, UserOut, UserRole } from "../types";
+import type { PermissionAction, PermissionResource, TechnicianRole, UserOut, UserRole } from "../types";
 
 export interface FacultyAssignmentInput {
   faculty_id: number;
   role: TechnicianRole;
 }
+
+export type PermissionsInput = Partial<Record<PermissionResource, PermissionAction[]>>;
 
 export interface UserCreatePayload {
   username: string;
@@ -13,6 +15,7 @@ export interface UserCreatePayload {
   phone: string;
   role: UserRole;
   faculty_assignments: FacultyAssignmentInput[];
+  permissions?: PermissionsInput | null;
   telegram_id?: number | null;
 }
 
@@ -21,6 +24,7 @@ export interface UserUpdatePayload {
   phone?: string;
   faculty_id?: number | null;
   faculty_assignments?: FacultyAssignmentInput[];
+  permissions?: PermissionsInput | null;
   password?: string;
   telegram_id?: number | null;
 }

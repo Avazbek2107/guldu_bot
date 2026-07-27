@@ -1,7 +1,20 @@
-import { useState } from "react";
+import { useRef, useState, type ChangeEvent } from "react";
 import { isAxiosError } from "axios";
-import { Layout, Menu, Button, Avatar, Dropdown, Tag, Drawer, Grid, Space, Modal, Form, Input, Divider, message } from "antd";
-import type { MenuProps } from "antd";
+import {
+  Layout,
+  Menu,
+  Button,
+  Avatar,
+  Dropdown,
+  Drawer,
+  Grid,
+  Space,
+  Modal,
+  Form,
+  Input,
+  Divider,
+  message,
+} from "antd";
 import {
   DashboardOutlined,
   UnorderedListOutlined,
@@ -14,28 +27,24 @@ import {
   MenuOutlined,
   DownOutlined,
   EditOutlined,
+  CameraOutlined,
 } from "@ant-design/icons";
 import { Outlet, useLocation, useNavigate } from "react-router-dom";
-import { updateProfile } from "../api/auth";
-import { csrfState } from "../api/client";
+import { updateProfile, uploadAvatar } from "../api/auth";
+import { csrfState, resolveAssetUrl } from "../api/client";
 import { useAuth } from "../auth/AuthContext";
+import { hasPermission } from "../auth/permissions";
 import { ROLE_LABELS_UZ, type UserRole } from "../types";
 
 const { Header, Sider, Content } = Layout;
 const { useBreakpoint } = Grid;
 
-const ROLE_COLORS: Record<UserRole, string> = {
-  super_admin: "gold",
-  technician_main: "blue",
-  technician_backup: "cyan",
-  faculty_staff: "green",
-};
-
-const ROLE_AVATAR_COLORS: Record<UserRole, string> = {
-  super_admin: "#faad14",
-  technician_main: "#1677ff",
-  technician_backup: "#13c2c2",
-  faculty_staff: "#52c41a",
+const ROLE_COLORS: Record<UserRole, [string, string]> = {
+  super_admin: ["#7c3aed", "#5b21b6"],
+  admin: ["#db2777", "#9d174d"],
+  technician_main: ["#2563eb", "#1e40af"],
+  technician_backup: ["#0891b2", "#155e75"],
+  faculty_staff: ["#16a34a", "#166534"],
 };
 
 function initials(fullName: string): string {
@@ -63,9 +72,12 @@ export function AppLayout() {
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [profileOpen, setProfileOpen] = useState(false);
   const [profileSaving, setProfileSaving] = useState(false);
+  const [avatarUploading, setAvatarUploading] = useState(false);
   const [profileForm] = Form.useForm<ProfileFormValues>();
+  const avatarInputRef = useRef<HTMLInputElement | null>(null);
 
-  const isSuperAdmin = user?.role === "super_admin";
+  const [roleColor, roleColorDark] = user ? ROLE_COLORS[user.role] : ["#2563eb", "#1e40af"];
+  const avatarSrc = user?.avatar_url ? resolveAssetUrl(user.avatar_url) : undefined;
 
   function openProfileModal() {
     if (!user) return;
@@ -108,14 +120,43 @@ export function AppLayout() {
     }
   }
 
+  async function handleAvatarFile(e: ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    e.target.value = "";
+    if (!file) return;
+    setAvatarUploading(true);
+    try {
+      const response = await uploadAvatar(file);
+      csrfState.token = response.csrf_token;
+      setUser(response.user);
+      message.success("Rasm yangilandi");
+    } catch (error) {
+      const detail =
+        isAxiosError<{ detail?: string }>(error) && error.response?.data?.detail
+          ? error.response.data.detail
+          : "Rasmni yuklashda xatolik yuz berdi";
+      message.error(detail);
+    } finally {
+      setAvatarUploading(false);
+    }
+  }
+
+  const isTechnician = user?.role === "technician_main" || user?.role === "technician_backup";
+  const canSeeTickets = isTechnician || hasPermission(user, "tickets");
+  const canSeeInventory = isTechnician || hasPermission(user, "inventory");
+
   const menuItems = [
-    isSuperAdmin ? { key: "/dashboard", icon: <DashboardOutlined />, label: "Dashboard" } : null,
-    { key: "/tickets", icon: <UnorderedListOutlined />, label: "Arizalar" },
-    { key: "/inventory", icon: <DatabaseOutlined />, label: "Inventar" },
-    isSuperAdmin ? { key: "/users", icon: <TeamOutlined />, label: "Xodimlar" } : null,
-    isSuperAdmin ? { key: "/end-users", icon: <UserOutlined />, label: "Foydalanuvchilar" } : null,
-    isSuperAdmin ? { key: "/faculties", icon: <BankOutlined />, label: "Fakultetlar" } : null,
-    isSuperAdmin ? { key: "/departments", icon: <ClusterOutlined />, label: "Bo'limlar" } : null,
+    hasPermission(user, "dashboard") ? { key: "/dashboard", icon: <DashboardOutlined />, label: "Dashboard" } : null,
+    canSeeTickets ? { key: "/tickets", icon: <UnorderedListOutlined />, label: "Arizalar" } : null,
+    canSeeInventory ? { key: "/inventory", icon: <DatabaseOutlined />, label: "Inventar" } : null,
+    hasPermission(user, "users") ? { key: "/users", icon: <TeamOutlined />, label: "Xodimlar" } : null,
+    hasPermission(user, "end_users")
+      ? { key: "/end-users", icon: <UserOutlined />, label: "Foydalanuvchilar" }
+      : null,
+    hasPermission(user, "faculties") ? { key: "/faculties", icon: <BankOutlined />, label: "Fakultetlar" } : null,
+    hasPermission(user, "departments")
+      ? { key: "/departments", icon: <ClusterOutlined />, label: "Bo'limlar" }
+      : null,
   ].filter((item): item is NonNullable<typeof item> => item !== null);
 
   const menu = (
@@ -135,22 +176,7 @@ export function AppLayout() {
     <div style={{ color: "white", textAlign: "center", padding: 16, fontWeight: 600 }}>Texnik Yordam</div>
   );
 
-  const userMenuItems: MenuProps["items"] = [
-    {
-      key: "info",
-      label: (
-        <div style={{ padding: "2px 4px", cursor: "default" }}>
-          <div style={{ fontWeight: 600 }}>{user?.full_name}</div>
-          {user && (
-            <Tag color={ROLE_COLORS[user.role]} style={{ marginTop: 4 }}>
-              {ROLE_LABELS_UZ[user.role]}
-            </Tag>
-          )}
-        </div>
-      ),
-      disabled: true,
-    },
-    { type: "divider" },
+  const userMenuItems = [
     { key: "profile", icon: <EditOutlined />, label: "Profilni tahrirlash" },
     { key: "logout", icon: <LogoutOutlined />, label: "Chiqish", danger: true },
   ];
@@ -200,10 +226,48 @@ export function AppLayout() {
             }}
             trigger={["click"]}
             placement="bottomRight"
+            popupRender={(menuNode) => (
+              <div style={{ borderRadius: 8, overflow: "hidden", boxShadow: "0 6px 16px rgba(11,11,11,0.16)" }}>
+                <div
+                  style={{
+                    background: `linear-gradient(135deg, ${roleColor}, ${roleColorDark})`,
+                    padding: "14px 16px",
+                    display: "flex",
+                    alignItems: "center",
+                    gap: 12,
+                  }}
+                >
+                  <Avatar
+                    size={40}
+                    src={avatarSrc}
+                    style={{ backgroundColor: "rgba(255,255,255,0.25)", flexShrink: 0 }}
+                  >
+                    {!avatarSrc && user ? initials(user.full_name) : null}
+                  </Avatar>
+                  <div style={{ minWidth: 0 }}>
+                    <div
+                      style={{
+                        color: "#fff",
+                        fontWeight: 600,
+                        overflow: "hidden",
+                        textOverflow: "ellipsis",
+                        whiteSpace: "nowrap",
+                      }}
+                    >
+                      {user?.full_name}
+                    </div>
+                    <div style={{ color: "rgba(255,255,255,0.85)", fontSize: 12 }}>
+                      {user ? ROLE_LABELS_UZ[user.role] : ""}
+                    </div>
+                  </div>
+                </div>
+                {menuNode}
+              </div>
+            )}
           >
             <Space size={8} style={{ cursor: "pointer", minWidth: 0 }}>
-              <Avatar style={{ backgroundColor: user ? ROLE_AVATAR_COLORS[user.role] : "#1677ff", flexShrink: 0 }}>
-                {user ? initials(user.full_name) : ""}
+              <Avatar src={avatarSrc} style={{ backgroundColor: roleColor, flexShrink: 0 }}>
+                {!avatarSrc && user ? initials(user.full_name) : ""}
               </Avatar>
               {!isMobile && (
                 <span style={{ maxWidth: 200, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
@@ -228,6 +292,28 @@ export function AppLayout() {
         okText="Saqlash"
         cancelText="Bekor qilish"
       >
+        <div style={{ display: "flex", justifyContent: "center", marginBottom: 20 }}>
+          <div style={{ position: "relative" }}>
+            <Avatar size={72} src={avatarSrc} style={{ backgroundColor: roleColor }}>
+              {!avatarSrc && user ? initials(user.full_name) : null}
+            </Avatar>
+            <Button
+              shape="circle"
+              size="small"
+              icon={<CameraOutlined />}
+              loading={avatarUploading}
+              style={{ position: "absolute", bottom: -2, right: -2 }}
+              onClick={() => avatarInputRef.current?.click()}
+            />
+            <input
+              ref={avatarInputRef}
+              type="file"
+              accept="image/png,image/jpeg,image/webp"
+              style={{ display: "none" }}
+              onChange={handleAvatarFile}
+            />
+          </div>
+        </div>
         <Form form={profileForm} layout="vertical" onFinish={handleProfileSave}>
           <Form.Item name="full_name" label="FISH" rules={[{ required: true }]}>
             <Input />

@@ -3,7 +3,7 @@ from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import aliased
 
-from app.api.deps import get_current_user, require_roles, technician_faculty_ids
+from app.api.deps import get_current_user, has_permission, technician_faculty_ids
 from app.core.database import get_db
 from app.models.enums import TechnicianFacultyRole, TicketStatus, UserRole
 from app.models.faculty import Faculty
@@ -26,8 +26,10 @@ router = APIRouter(prefix="/inventory", tags=["inventory"])
 TECHNICIAN_ROLES = (UserRole.TECHNICIAN_MAIN, UserRole.TECHNICIAN_BACKUP)
 
 
-def _check_access(current_user: User, faculty_id: int) -> None:
+def _check_access(current_user: User, faculty_id: int, action: str = "edit") -> None:
     if current_user.role == UserRole.SUPER_ADMIN:
+        return
+    if current_user.role == UserRole.ADMIN and has_permission(current_user, "inventory", action):
         return
     if current_user.role in TECHNICIAN_ROLES and faculty_id in technician_faculty_ids(current_user):
         return
@@ -97,7 +99,9 @@ async def _fetch_inventory(
         .outerjoin(technician_alias, InventoryItem.assigned_technician_id == technician_alias.id)
     )
 
-    if current_user.role == UserRole.SUPER_ADMIN:
+    if current_user.role == UserRole.SUPER_ADMIN or (
+        current_user.role == UserRole.ADMIN and has_permission(current_user, "inventory", "view")
+    ):
         if faculty_id is not None:
             query = query.where(InventoryItem.faculty_id == faculty_id)
     elif current_user.role in TECHNICIAN_ROLES:
@@ -157,12 +161,16 @@ async def export_inventory(
     )
 
 
-@router.post(
-    "/import",
-    response_model=InventoryImportResult,
-    dependencies=[Depends(require_roles(UserRole.SUPER_ADMIN))],
-)
-async def import_inventory(file: UploadFile = File(...), db: AsyncSession = Depends(get_db)):
+@router.post("/import", response_model=InventoryImportResult)
+async def import_inventory(
+    file: UploadFile = File(...),
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    if current_user.role != UserRole.SUPER_ADMIN and not (
+        current_user.role == UserRole.ADMIN and has_permission(current_user, "inventory", "create")
+    ):
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Bu amal uchun ruxsatingiz yo'q")
     content = await file.read()
     try:
         rows = parse_inventory_rows(content)
@@ -224,7 +232,7 @@ async def get_inventory_history(
     item = await db.get(InventoryItem, item_id)
     if item is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Inventar topilmadi")
-    _check_access(current_user, item.faculty_id)
+    _check_access(current_user, item.faculty_id, "view")
 
     technician_alias = aliased(User)
     rows = (
@@ -254,7 +262,7 @@ async def create_inventory_item(
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-    _check_access(current_user, payload.faculty_id)
+    _check_access(current_user, payload.faculty_id, "create")
     faculty = await db.get(Faculty, payload.faculty_id)
     if faculty is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Fakultet/bo'lim topilmadi")
@@ -308,6 +316,6 @@ async def delete_inventory_item(
     item = await db.get(InventoryItem, item_id)
     if item is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Inventar topilmadi")
-    _check_access(current_user, item.faculty_id)
+    _check_access(current_user, item.faculty_id, "delete")
     await db.delete(item)
     await db.commit()

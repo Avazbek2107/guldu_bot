@@ -31,3 +31,12 @@ export async function updateProfile(payload: ProfileUpdatePayload): Promise<Auth
   const { data } = await apiClient.patch<AuthResponse>("/auth/me", payload);
   return data;
 }
+
+export async function uploadAvatar(file: File): Promise<AuthResponse> {
+  const formData = new FormData();
+  formData.append("file", file);
+  const { data } = await apiClient.post<AuthResponse>("/auth/me/avatar", formData, {
+    headers: { "Content-Type": "multipart/form-data" },
+  });
+  return data;
+}

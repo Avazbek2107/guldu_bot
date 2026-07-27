@@ -3,9 +3,9 @@ from sqlalchemy import select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.api.deps import get_current_user, require_roles
+from app.api.deps import get_current_user, has_permission
 from app.core.database import get_db
-from app.models.enums import OrgUnitType, UserRole
+from app.models.enums import OrgUnitType
 from app.models.faculty import Faculty
 from app.models.user import User
 from app.schemas.faculty import (
@@ -18,6 +18,15 @@ from app.schemas.faculty import (
 from app.services.faculty_excel import generate_faculty_xlsx, parse_faculty_rows
 
 router = APIRouter(prefix="/faculties", tags=["faculties"])
+
+
+def _resource_for_unit_type(unit_type: OrgUnitType) -> str:
+    return "departments" if unit_type == OrgUnitType.DEPARTMENT else "faculties"
+
+
+def _require_permission(current_user: User, unit_type: OrgUnitType, action: str) -> None:
+    if not has_permission(current_user, _resource_for_unit_type(unit_type), action):
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Bu amal uchun ruxsatingiz yo'q")
 
 
 @router.get("", response_model=list[FacultyOut])
@@ -37,8 +46,9 @@ async def list_faculties(
 async def export_faculties(
     unit_type: OrgUnitType | None = None,
     db: AsyncSession = Depends(get_db),
-    _: User = Depends(require_roles(UserRole.SUPER_ADMIN)),
+    current_user: User = Depends(get_current_user),
 ):
+    _require_permission(current_user, unit_type or OrgUnitType.FACULTY, "view")
     query = select(Faculty)
     if unit_type is not None:
         query = query.where(Faculty.unit_type == unit_type)
@@ -58,8 +68,9 @@ async def import_faculties(
     unit_type: OrgUnitType = OrgUnitType.FACULTY,
     file: UploadFile = File(...),
     db: AsyncSession = Depends(get_db),
-    _: User = Depends(require_roles(UserRole.SUPER_ADMIN)),
+    current_user: User = Depends(get_current_user),
 ):
+    _require_permission(current_user, unit_type, "create")
     content = await file.read()
     try:
         rows = parse_faculty_rows(content)
@@ -90,8 +101,9 @@ async def import_faculties(
 async def create_faculty(
     payload: FacultyCreate,
     db: AsyncSession = Depends(get_db),
-    _: User = Depends(require_roles(UserRole.SUPER_ADMIN)),
+    current_user: User = Depends(get_current_user),
 ):
+    _require_permission(current_user, payload.unit_type, "create")
     faculty = Faculty(name=payload.name, unit_type=payload.unit_type)
     db.add(faculty)
     try:
@@ -111,11 +123,12 @@ async def update_faculty(
     faculty_id: int,
     payload: FacultyUpdate,
     db: AsyncSession = Depends(get_db),
-    _: User = Depends(require_roles(UserRole.SUPER_ADMIN)),
+    current_user: User = Depends(get_current_user),
 ):
     faculty = await db.get(Faculty, faculty_id)
     if faculty is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Fakultet/bo'lim topilmadi")
+    _require_permission(current_user, faculty.unit_type, "edit")
     faculty.name = payload.name
     try:
         await db.commit()

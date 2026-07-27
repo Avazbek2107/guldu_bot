@@ -1,9 +1,15 @@
 import { Spin } from "antd";
 import { Navigate, Outlet } from "react-router-dom";
 import { useAuth } from "./AuthContext";
-import type { UserRole } from "../types";
+import { hasPermission } from "./permissions";
+import type { PermissionAction, PermissionResource, UserRole } from "../types";
 
-export function ProtectedRoute({ allowedRoles }: { allowedRoles?: UserRole[] }) {
+interface ProtectedRouteProps {
+  allowedRoles?: UserRole[];
+  permission?: { resource: PermissionResource; action?: PermissionAction };
+}
+
+export function ProtectedRoute({ allowedRoles, permission }: ProtectedRouteProps) {
   const { user, loading } = useAuth();
 
   if (loading) {
@@ -16,8 +22,14 @@ export function ProtectedRoute({ allowedRoles }: { allowedRoles?: UserRole[] }) 
   if (!user) {
     return <Navigate to="/login" replace />;
   }
-  if (allowedRoles && !allowedRoles.includes(user.role)) {
-    return <Navigate to="/tickets" replace />;
+
+  if (allowedRoles || permission) {
+    const roleAllowed = allowedRoles?.includes(user.role) ?? false;
+    const permissionAllowed = permission ? hasPermission(user, permission.resource, permission.action) : false;
+    if (!roleAllowed && !permissionAllowed) {
+      return <Navigate to="/tickets" replace />;
+    }
   }
+
   return <Outlet />;
 }

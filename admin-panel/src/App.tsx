@@ -32,14 +32,41 @@ function App() {
         <Route element={<ProtectedRoute />}>
           <Route element={<AppLayout />}>
             <Route index element={<Navigate to="/tickets" replace />} />
-            <Route path="/tickets" element={<TicketsPage />} />
-            <Route path="/inventory" element={<InventoryPage />} />
 
-            <Route element={<ProtectedRoute allowedRoles={["super_admin"]} />}>
+            <Route
+              element={
+                <ProtectedRoute
+                  allowedRoles={["technician_main", "technician_backup"]}
+                  permission={{ resource: "tickets" }}
+                />
+              }
+            >
+              <Route path="/tickets" element={<TicketsPage />} />
+            </Route>
+            <Route
+              element={
+                <ProtectedRoute
+                  allowedRoles={["technician_main", "technician_backup"]}
+                  permission={{ resource: "inventory" }}
+                />
+              }
+            >
+              <Route path="/inventory" element={<InventoryPage />} />
+            </Route>
+
+            <Route element={<ProtectedRoute permission={{ resource: "dashboard" }} />}>
               <Route path="/dashboard" element={<DashboardPage />} />
+            </Route>
+            <Route element={<ProtectedRoute permission={{ resource: "users" }} />}>
               <Route path="/users" element={<UsersPage />} />
+            </Route>
+            <Route element={<ProtectedRoute permission={{ resource: "end_users" }} />}>
               <Route path="/end-users" element={<EndUsersPage />} />
+            </Route>
+            <Route element={<ProtectedRoute permission={{ resource: "faculties" }} />}>
               <Route path="/faculties" element={<FacultiesPage />} />
+            </Route>
+            <Route element={<ProtectedRoute permission={{ resource: "departments" }} />}>
               <Route path="/departments" element={<DepartmentsPage />} />
             </Route>
           </Route>

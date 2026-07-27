@@ -57,3 +57,23 @@ def require_roles(*roles: UserRole):
         return current_user
 
     return checker
+
+
+def has_permission(user: User, resource: str, action: str = "view") -> bool:
+    if user.role == UserRole.SUPER_ADMIN:
+        return True
+    if user.role == UserRole.ADMIN:
+        return action in (user.permissions or {}).get(resource, [])
+    return False
+
+
+def require_permission(resource: str, action: str = "view"):
+    async def checker(current_user: User = Depends(get_current_user)) -> User:
+        if not has_permission(current_user, resource, action):
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="Bu amal uchun ruxsatingiz yo'q",
+            )
+        return current_user
+
+    return checker

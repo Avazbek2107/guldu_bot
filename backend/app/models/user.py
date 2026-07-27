@@ -1,6 +1,6 @@
 from datetime import datetime
 
-from sqlalchemy import BigInteger, Boolean, DateTime, ForeignKey, Integer, String
+from sqlalchemy import BigInteger, Boolean, DateTime, ForeignKey, Integer, JSON, String
 from sqlalchemy import Enum as SAEnum
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
@@ -28,6 +28,9 @@ class User(Base, TimestampMixin):
 
     is_blocked: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
     is_suspicious: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
+
+    permissions: Mapped[dict | None] = mapped_column(JSON, nullable=True)
+    avatar_path: Mapped[str | None] = mapped_column(String(255), nullable=True)
 
     failed_login_attempts: Mapped[int] = mapped_column(Integer, default=0, server_default="0", nullable=False)
     locked_until: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)

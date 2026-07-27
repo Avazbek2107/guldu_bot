@@ -6,7 +6,7 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import aliased
 
-from app.api.deps import get_current_user, technician_faculty_ids
+from app.api.deps import get_current_user, has_permission, technician_faculty_ids
 from app.core.database import get_db
 from app.models.enums import TicketCategory, TicketPriority, TicketStatus, UserRole
 from app.models.faculty import Faculty
@@ -26,6 +26,16 @@ TECHNICIAN_ROLES = (UserRole.TECHNICIAN_MAIN, UserRole.TECHNICIAN_BACKUP)
 def _can_access_ticket_faculty(current_user: User, faculty_id: int) -> bool:
     if current_user.role == UserRole.SUPER_ADMIN:
         return True
+    if current_user.role == UserRole.ADMIN:
+        return has_permission(current_user, "tickets", "view")
+    return current_user.role in TECHNICIAN_ROLES and faculty_id in technician_faculty_ids(current_user)
+
+
+def _can_modify_ticket_faculty(current_user: User, faculty_id: int) -> bool:
+    if current_user.role == UserRole.SUPER_ADMIN:
+        return True
+    if current_user.role == UserRole.ADMIN:
+        return has_permission(current_user, "tickets", "edit")
     return current_user.role in TECHNICIAN_ROLES and faculty_id in technician_faculty_ids(current_user)
 
 
@@ -94,7 +104,9 @@ async def list_tickets(
         .outerjoin(InventoryItem, Ticket.inventory_item_id == InventoryItem.id)
     )
 
-    if current_user.role == UserRole.SUPER_ADMIN:
+    if current_user.role == UserRole.SUPER_ADMIN or (
+        current_user.role == UserRole.ADMIN and has_permission(current_user, "tickets", "view")
+    ):
         if faculty_id is not None:
             query = query.where(Ticket.faculty_id == faculty_id)
     elif current_user.role in TECHNICIAN_ROLES:
@@ -210,7 +222,7 @@ async def close_ticket(
     ticket = await db.get(Ticket, ticket_id)
     if ticket is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Ariza topilmadi")
-    if not _can_access_ticket_faculty(current_user, ticket.faculty_id):
+    if not _can_modify_ticket_faculty(current_user, ticket.faculty_id):
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Bu amal uchun ruxsatingiz yo'q")
 
     inventory_item = await db.get(InventoryItem, payload.inventory_item_id)
@@ -239,7 +251,7 @@ async def reassign_ticket(
     ticket = await db.get(Ticket, ticket_id)
     if ticket is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Ariza topilmadi")
-    if not _can_access_ticket_faculty(current_user, ticket.faculty_id):
+    if not _can_modify_ticket_faculty(current_user, ticket.faculty_id):
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Bu amal uchun ruxsatingiz yo'q")
 
     technician = await db.get(User, payload.technician_id)

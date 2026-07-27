@@ -1,4 +1,15 @@
-export type UserRole = "super_admin" | "technician_main" | "technician_backup" | "faculty_staff";
+export type UserRole = "super_admin" | "admin" | "technician_main" | "technician_backup" | "faculty_staff";
+
+export type PermissionResource =
+  | "dashboard"
+  | "tickets"
+  | "inventory"
+  | "users"
+  | "end_users"
+  | "faculties"
+  | "departments";
+
+export type PermissionAction = "view" | "create" | "edit" | "delete";
 
 export type TicketCategory =
   | "computer"
@@ -36,9 +47,27 @@ export const STATUS_LABELS_UZ: Record<TicketStatus, string> = {
 
 export const ROLE_LABELS_UZ: Record<UserRole, string> = {
   super_admin: "Super Admin",
+  admin: "Admin",
   technician_main: "Asosiy texnik xodim",
   technician_backup: "Zaxira texnik xodim",
   faculty_staff: "Fakultet xodimi",
+};
+
+export const PERMISSION_RESOURCE_LABELS_UZ: Record<PermissionResource, string> = {
+  dashboard: "Dashboard",
+  tickets: "Arizalar",
+  inventory: "Inventar",
+  users: "Xodimlar",
+  end_users: "Foydalanuvchilar",
+  faculties: "Fakultetlar",
+  departments: "Bo'limlar",
+};
+
+export const PERMISSION_ACTION_LABELS_UZ: Record<PermissionAction, string> = {
+  view: "Ko'rish",
+  create: "Qo'shish",
+  edit: "Tahrirlash",
+  delete: "O'chirish",
 };
 
 export type TechnicianRole = "technician_main" | "technician_backup";
@@ -57,6 +86,8 @@ export interface UserOut {
   role: UserRole;
   faculty_id: number | null;
   faculty_assignments: FacultyAssignment[];
+  permissions: Partial<Record<PermissionResource, PermissionAction[]>> | null;
+  avatar_url: string | null;
   telegram_id: number | null;
   is_blocked: boolean;
   is_suspicious: boolean;

@@ -1,6 +1,7 @@
 from datetime import datetime, timedelta, timezone
+from pathlib import Path
 
-from fastapi import APIRouter, Depends, HTTPException, Request, Response, status
+from fastapi import APIRouter, Depends, File, HTTPException, Request, Response, UploadFile, status
 from sqlalchemy import select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -22,6 +23,14 @@ router = APIRouter(prefix="/auth", tags=["auth"])
 MAX_LOGIN_ATTEMPTS = 5
 LOCKOUT_MINUTES = 15
 COOKIE_NAME = "access_token"
+
+AVATAR_MAX_BYTES = 2 * 1024 * 1024
+AVATAR_ALLOWED_TYPES = {"image/jpeg": "jpg", "image/png": "png", "image/webp": "webp"}
+
+
+async def _reload_me(db: AsyncSession, user_id: int) -> User:
+    result = await db.execute(select(User).where(User.id == user_id).options(_assignments_loader))
+    return result.scalar_one()
 
 
 def _set_auth_cookie(response: Response, token: str) -> None:
@@ -119,9 +128,39 @@ async def update_me(
             status_code=status.HTTP_409_CONFLICT, detail="Bu login allaqachon band"
         ) from exc
 
-    result = await db.execute(
-        select(User).where(User.id == current_user.id).options(_assignments_loader)
-    )
-    user = result.scalar_one()
+    user = await _reload_me(db, current_user.id)
+    csrf_token = request.state.jwt_payload.get("csrf", "")
+    return MeResponse(csrf_token=csrf_token, user=serialize_user(user))
+
+
+@router.post("/me/avatar", response_model=MeResponse)
+async def upload_avatar(
+    request: Request,
+    file: UploadFile = File(...),
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    ext = AVATAR_ALLOWED_TYPES.get(file.content_type or "")
+    if ext is None:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Faqat JPEG, PNG yoki WEBP rasm yuklash mumkin")
+
+    content = await file.read()
+    if len(content) > AVATAR_MAX_BYTES:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Rasm hajmi 2MB dan oshmasligi kerak")
+
+    avatars_dir = Path(settings.storage_dir) / "avatars"
+    avatars_dir.mkdir(parents=True, exist_ok=True)
+
+    for old_ext in AVATAR_ALLOWED_TYPES.values():
+        old_path = avatars_dir / f"{current_user.id}.{old_ext}"
+        if old_path.exists():
+            old_path.unlink()
+
+    filename = f"{current_user.id}.{ext}"
+    (avatars_dir / filename).write_bytes(content)
+    current_user.avatar_path = f"avatars/{filename}"
+    await db.commit()
+
+    user = await _reload_me(db, current_user.id)
     csrf_token = request.state.jwt_payload.get("csrf", "")
     return MeResponse(csrf_token=csrf_token, user=serialize_user(user))

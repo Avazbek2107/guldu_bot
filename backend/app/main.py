@@ -1,6 +1,9 @@
+import os
+
 from fastapi import Depends, FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
+from fastapi.staticfiles import StaticFiles
 from jwt import PyJWTError
 from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -11,6 +14,10 @@ from app.core.database import get_db
 from app.core.security import decode_access_token
 
 app = FastAPI(title="Technician Support Bot API")
+
+_avatars_dir = os.path.join(settings.storage_dir, "avatars")
+os.makedirs(_avatars_dir, exist_ok=True)
+app.mount("/storage/avatars", StaticFiles(directory=_avatars_dir), name="avatars")
 
 app.add_middleware(
     CORSMiddleware,

@@ -48,3 +48,7 @@ export async function downloadBlob(
 export async function downloadTicketPdf(ticketId: number, filename: string): Promise<void> {
   await downloadBlob(`/tickets/${ticketId}/pdf`, undefined, filename);
 }
+
+export function resolveAssetUrl(path: string): string {
+  return `${API_BASE_URL}${path}`;
+}

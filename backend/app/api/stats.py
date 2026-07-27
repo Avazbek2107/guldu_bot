@@ -5,7 +5,7 @@ from fastapi import APIRouter, Depends
 from sqlalchemy import case, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.api.deps import require_roles
+from app.api.deps import require_permission
 from app.core.database import get_db
 from app.models.enums import TicketStatus, UserRole
 from app.models.faculty import Faculty
@@ -34,7 +34,7 @@ INVENTORY_STATUS_IN_REPAIR = "ta'mirlanmoqda"
 INVENTORY_STATUS_DECOMMISSIONED = "hisobdan chiqarilgan"
 
 
-@router.get("/dashboard", response_model=DashboardStats, dependencies=[Depends(require_roles(UserRole.SUPER_ADMIN))])
+@router.get("/dashboard", response_model=DashboardStats, dependencies=[Depends(require_permission("dashboard", "view"))])
 async def get_dashboard_stats(db: AsyncSession = Depends(get_db)):
     now = datetime.now(timezone.utc)
 

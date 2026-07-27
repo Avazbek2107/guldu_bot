@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { Button, Card, Form, Input, InputNumber, Modal, Select, Space, Table, Tag, message } from "antd";
 import { MinusCircleOutlined, PlusOutlined } from "@ant-design/icons";
 import { ActionsMenu } from "../components/ActionsMenu";
+import { PermissionMatrix, type PermissionsValue } from "../components/PermissionMatrix";
 import { CARD_STYLE } from "../theme";
 import {
   blockUser,
@@ -22,13 +23,14 @@ import {
   type UserRole,
 } from "../types";
 
-const EMPLOYEE_ROLES: UserRole[] = ["technician_main", "technician_backup", "super_admin"];
+const EMPLOYEE_ROLES: UserRole[] = ["technician_main", "technician_backup", "admin", "super_admin"];
 const TECHNICIAN_ROLES: UserRole[] = ["technician_main", "technician_backup"];
 
-type UiRole = "technician" | "super_admin";
+type UiRole = "technician" | "admin" | "super_admin";
 
 const UI_ROLE_OPTIONS: { value: UiRole; label: string }[] = [
   { value: "technician", label: "Texnik xodim" },
+  { value: "admin", label: "Admin" },
   { value: "super_admin", label: "Super Admin" },
 ];
 
@@ -48,6 +50,7 @@ interface CreateFormValues {
   password: string;
   uiRole: UiRole;
   faculty_assignments?: FacultyAssignmentInput[];
+  permissions?: PermissionsValue;
   telegram_id?: number;
 }
 
@@ -57,6 +60,7 @@ interface EditFormValues {
   password?: string;
   telegram_id?: number;
   faculty_assignments?: FacultyAssignmentInput[];
+  permissions?: PermissionsValue;
 }
 
 function FacultyAssignmentsList({ faculties }: { faculties: FacultyOut[] }) {
@@ -145,13 +149,20 @@ export function UsersPage() {
     setSaving(true);
     try {
       const assignments = values.uiRole === "technician" ? values.faculty_assignments ?? [] : [];
+      const role: UserRole =
+        values.uiRole === "super_admin"
+          ? "super_admin"
+          : values.uiRole === "admin"
+            ? "admin"
+            : resolveTechnicianRole(assignments);
       await createUser({
         username: values.username,
         password: values.password,
         full_name: values.full_name,
         phone: values.phone,
-        role: values.uiRole === "super_admin" ? "super_admin" : resolveTechnicianRole(assignments),
+        role,
         faculty_assignments: assignments,
+        permissions: values.uiRole === "admin" ? values.permissions ?? {} : null,
         telegram_id: values.telegram_id ?? null,
       });
       message.success("Xodim yaratildi");
@@ -168,6 +179,7 @@ export function UsersPage() {
   async function handleEditSave(values: EditFormValues) {
     if (!editTarget) return;
     const isTechnician = TECHNICIAN_ROLES.includes(editTarget.role);
+    const isAdmin = editTarget.role === "admin";
     setSaving(true);
     try {
       await updateUser(editTarget.id, {
@@ -176,6 +188,7 @@ export function UsersPage() {
         password: values.password || undefined,
         telegram_id: values.telegram_id ?? null,
         ...(isTechnician ? { faculty_assignments: values.faculty_assignments ?? [] } : {}),
+        ...(isAdmin ? { permissions: values.permissions ?? {} } : {}),
       });
       message.success("Saqlandi");
       setEditTarget(null);
@@ -213,6 +226,7 @@ export function UsersPage() {
   }
 
   const editTargetIsTechnician = editTarget != null && TECHNICIAN_ROLES.includes(editTarget.role);
+  const editTargetIsAdmin = editTarget?.role === "admin";
 
   return (
     <div>
@@ -308,6 +322,7 @@ export function UsersPage() {
                           faculty_id: a.faculty_id,
                           role: a.role,
                         })),
+                        permissions: record.permissions ?? {},
                       });
                     },
                   },
@@ -374,13 +389,24 @@ export function UsersPage() {
             noStyle
             shouldUpdate={(prev: CreateFormValues, cur: CreateFormValues) => prev.uiRole !== cur.uiRole}
           >
-            {({ getFieldValue }) =>
-              getFieldValue("uiRole") === "technician" ? (
-                <Form.Item label="Fakultet biriktirishlar">
-                  <FacultyAssignmentsList faculties={faculties} />
-                </Form.Item>
-              ) : null
-            }
+            {({ getFieldValue }) => {
+              const uiRole = getFieldValue("uiRole");
+              if (uiRole === "technician") {
+                return (
+                  <Form.Item label="Fakultet biriktirishlar">
+                    <FacultyAssignmentsList faculties={faculties} />
+                  </Form.Item>
+                );
+              }
+              if (uiRole === "admin") {
+                return (
+                  <Form.Item name="permissions" label="Ruxsatlar">
+                    <PermissionMatrix />
+                  </Form.Item>
+                );
+              }
+              return null;
+            }}
           </Form.Item>
           <Form.Item
             name="telegram_id"
@@ -411,6 +437,11 @@ export function UsersPage() {
           {editTargetIsTechnician && (
             <Form.Item label="Fakultet biriktirishlar">
               <FacultyAssignmentsList faculties={faculties} />
+            </Form.Item>
+          )}
+          {editTargetIsAdmin && (
+            <Form.Item name="permissions" label="Ruxsatlar">
+              <PermissionMatrix />
             </Form.Item>
           )}
           <Form.Item
