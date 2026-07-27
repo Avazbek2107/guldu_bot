@@ -107,10 +107,18 @@ export function EndUsersPage() {
           {
             title: "Telegram",
             dataIndex: "telegram_id",
-            onCell: (record: UserOut) => ({
-              style: { background: record.telegram_id != null ? "#e6f7e6" : "#fdecec" },
-            }),
-            render: (v: number | null) => (v != null ? "Bog'langan" : "Bog'lanmagan"),
+            render: (v: number | null) => (
+              <div
+                style={{
+                  background: v != null ? "#e6f7e6" : "#fdecec",
+                  borderRadius: 6,
+                  padding: "4px 10px",
+                  textAlign: "center",
+                }}
+              >
+                {v != null ? "Bog'langan" : "Bog'lanmagan"}
+              </div>
+            ),
           },
           {
             title: "Holat",
