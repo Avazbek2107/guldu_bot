@@ -2,17 +2,20 @@ from datetime import datetime, timedelta, timezone
 
 from fastapi import APIRouter, Depends, HTTPException, Request, Response, status
 from sqlalchemy import select
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
 from app.api.deps import get_current_user
 from app.core.config import settings
 from app.core.database import get_db
-from app.core.security import create_access_token, verify_password
+from app.core.security import create_access_token, hash_password, verify_password
 from app.models.technician_faculty_assignment import TechnicianFacultyAssignment
 from app.models.user import User
-from app.schemas.auth import LoginRequest, MeResponse, TokenResponse
+from app.schemas.auth import LoginRequest, MeResponse, ProfileUpdateRequest, TokenResponse
 from app.schemas.user import serialize_user
+
+_assignments_loader = selectinload(User.faculty_assignments).selectinload(TechnicianFacultyAssignment.faculty)
 
 router = APIRouter(prefix="/auth", tags=["auth"])
 
@@ -83,3 +86,42 @@ async def logout(response: Response):
 async def me(request: Request, current_user: User = Depends(get_current_user)):
     csrf_token = request.state.jwt_payload.get("csrf", "")
     return MeResponse(csrf_token=csrf_token, user=serialize_user(current_user))
+
+
+@router.patch("/me", response_model=MeResponse)
+async def update_me(
+    payload: ProfileUpdateRequest,
+    request: Request,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    wants_sensitive_change = payload.username is not None or payload.new_password is not None
+    if wants_sensitive_change:
+        if (
+            not payload.current_password
+            or current_user.password_hash is None
+            or not verify_password(payload.current_password, current_user.password_hash)
+        ):
+            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Joriy parol noto'g'ri")
+
+    if payload.full_name is not None:
+        current_user.full_name = payload.full_name
+    if payload.username is not None:
+        current_user.username = payload.username
+    if payload.new_password is not None:
+        current_user.password_hash = hash_password(payload.new_password)
+
+    try:
+        await db.commit()
+    except IntegrityError as exc:
+        await db.rollback()
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT, detail="Bu login allaqachon band"
+        ) from exc
+
+    result = await db.execute(
+        select(User).where(User.id == current_user.id).options(_assignments_loader)
+    )
+    user = result.scalar_one()
+    csrf_token = request.state.jwt_payload.get("csrf", "")
+    return MeResponse(csrf_token=csrf_token, user=serialize_user(user))

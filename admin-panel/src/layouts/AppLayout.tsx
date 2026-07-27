@@ -1,5 +1,6 @@
 import { useState } from "react";
-import { Layout, Menu, Button, Avatar, Dropdown, Tag, Drawer, Grid, Space } from "antd";
+import { isAxiosError } from "axios";
+import { Layout, Menu, Button, Avatar, Dropdown, Tag, Drawer, Grid, Space, Modal, Form, Input, Divider, message } from "antd";
 import type { MenuProps } from "antd";
 import {
   DashboardOutlined,
@@ -12,8 +13,11 @@ import {
   LogoutOutlined,
   MenuOutlined,
   DownOutlined,
+  EditOutlined,
 } from "@ant-design/icons";
 import { Outlet, useLocation, useNavigate } from "react-router-dom";
+import { updateProfile } from "../api/auth";
+import { csrfState } from "../api/client";
 import { useAuth } from "../auth/AuthContext";
 import { ROLE_LABELS_UZ, type UserRole } from "../types";
 
@@ -43,15 +47,66 @@ function initials(fullName: string): string {
     .join("");
 }
 
+interface ProfileFormValues {
+  full_name: string;
+  username: string;
+  current_password?: string;
+  new_password?: string;
+}
+
 export function AppLayout() {
-  const { user, logout } = useAuth();
+  const { user, logout, setUser } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
   const screens = useBreakpoint();
   const isMobile = !screens.lg;
   const [drawerOpen, setDrawerOpen] = useState(false);
+  const [profileOpen, setProfileOpen] = useState(false);
+  const [profileSaving, setProfileSaving] = useState(false);
+  const [profileForm] = Form.useForm<ProfileFormValues>();
 
   const isSuperAdmin = user?.role === "super_admin";
+
+  function openProfileModal() {
+    if (!user) return;
+    profileForm.setFieldsValue({
+      full_name: user.full_name,
+      username: user.username ?? "",
+      current_password: undefined,
+      new_password: undefined,
+    });
+    setProfileOpen(true);
+  }
+
+  async function handleProfileSave(values: ProfileFormValues) {
+    setProfileSaving(true);
+    try {
+      const payload: Parameters<typeof updateProfile>[0] = {
+        full_name: values.full_name,
+        username: values.username,
+      };
+      if (values.new_password) {
+        payload.new_password = values.new_password;
+      }
+      if (values.username !== user?.username || values.new_password) {
+        payload.current_password = values.current_password;
+      }
+      const response = await updateProfile(payload);
+      csrfState.token = response.csrf_token;
+      setUser(response.user);
+      message.success("Profil yangilandi");
+      setProfileOpen(false);
+      profileForm.resetFields();
+    } catch (error) {
+      const detail =
+        isAxiosError<{ detail?: string }>(error) && error.response?.data?.detail
+          ? error.response.data.detail
+          : "Xatolik yuz berdi";
+      message.error(detail);
+    } finally {
+      setProfileSaving(false);
+    }
+  }
 
   const menuItems = [
     isSuperAdmin ? { key: "/dashboard", icon: <DashboardOutlined />, label: "Dashboard" } : null,
@@ -96,6 +151,7 @@ export function AppLayout() {
       disabled: true,
     },
     { type: "divider" },
+    { key: "profile", icon: <EditOutlined />, label: "Profilni tahrirlash" },
     { key: "logout", icon: <LogoutOutlined />, label: "Chiqish", danger: true },
   ];
 
@@ -135,7 +191,13 @@ export function AppLayout() {
             {isMobile && <Button icon={<MenuOutlined />} onClick={() => setDrawerOpen(true)} />}
           </Space>
           <Dropdown
-            menu={{ items: userMenuItems, onClick: ({ key }) => key === "logout" && logout() }}
+            menu={{
+              items: userMenuItems,
+              onClick: ({ key }) => {
+                if (key === "logout") logout();
+                if (key === "profile") openProfileModal();
+              },
+            }}
             trigger={["click"]}
             placement="bottomRight"
           >
@@ -156,6 +218,36 @@ export function AppLayout() {
           <Outlet />
         </Content>
       </Layout>
+
+      <Modal
+        title="Profilni tahrirlash"
+        open={profileOpen}
+        onCancel={() => setProfileOpen(false)}
+        onOk={() => profileForm.submit()}
+        confirmLoading={profileSaving}
+        okText="Saqlash"
+        cancelText="Bekor qilish"
+      >
+        <Form form={profileForm} layout="vertical" onFinish={handleProfileSave}>
+          <Form.Item name="full_name" label="FISH" rules={[{ required: true }]}>
+            <Input />
+          </Form.Item>
+          <Form.Item name="username" label="Login" rules={[{ required: true, min: 3 }]}>
+            <Input />
+          </Form.Item>
+          <Divider style={{ margin: "12px 0" }}>Parolni o'zgartirish (ixtiyoriy)</Divider>
+          <Form.Item name="new_password" label="Yangi parol" rules={[{ min: 8, message: "Kamida 8 ta belgi" }]}>
+            <Input.Password placeholder="Bo'sh qoldirsangiz, parol o'zgarmaydi" />
+          </Form.Item>
+          <Form.Item
+            name="current_password"
+            label="Joriy parol"
+            extra="Login yoki parolni o'zgartirish uchun joriy parolingizni kiriting"
+          >
+            <Input.Password />
+          </Form.Item>
+        </Form>
+      </Modal>
     </Layout>
   );
 }

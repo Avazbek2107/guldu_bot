@@ -19,3 +19,15 @@ export async function fetchMe(): Promise<AuthResponse> {
 export async function logout(): Promise<void> {
   await apiClient.post("/auth/logout");
 }
+
+export interface ProfileUpdatePayload {
+  full_name?: string;
+  username?: string;
+  current_password?: string;
+  new_password?: string;
+}
+
+export async function updateProfile(payload: ProfileUpdatePayload): Promise<AuthResponse> {
+  const { data } = await apiClient.patch<AuthResponse>("/auth/me", payload);
+  return data;
+}
