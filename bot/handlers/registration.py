@@ -5,11 +5,17 @@ from aiogram.types import CallbackQuery, Message
 from sqlalchemy import select
 
 from app.core.database import async_session_factory
-from app.models.enums import UserRole
+from app.models.enums import OrgUnitType, UserRole
 from app.models.faculty import Faculty
 from app.models.user import User
 
-from bot.keyboards import faculty_keyboard, main_menu_keyboard, phone_request_keyboard, remove_keyboard
+from bot.keyboards import (
+    faculty_keyboard,
+    main_menu_keyboard,
+    org_unit_type_keyboard,
+    phone_request_keyboard,
+    remove_keyboard,
+)
 from bot.services.users import get_user_by_phone, get_user_by_telegram_id
 from bot.states import ProfileChange, Registration
 
@@ -83,13 +89,25 @@ async def handle_full_name(message: Message, state: FSMContext) -> None:
         await message.answer("Iltimos, FISHni matn ko'rinishida kiriting.")
         return
     await state.update_data(full_name=full_name)
+    await state.set_state(Registration.waiting_org_unit_type)
+    await message.answer("Fakultet yoki bo'limga tegishli ekaningizni tanlang:", reply_markup=org_unit_type_keyboard())
+
+
+@router.callback_query(StateFilter(Registration.waiting_org_unit_type), F.data.startswith("orgtype:"))
+async def handle_registration_org_unit_type(callback: CallbackQuery, state: FSMContext) -> None:
+    unit_type = callback.data.split(":")[1]
 
     async with async_session_factory() as db:
-        result = await db.execute(select(Faculty).order_by(Faculty.name))
+        result = await db.execute(
+            select(Faculty).where(Faculty.unit_type == OrgUnitType(unit_type)).order_by(Faculty.name)
+        )
         faculties = list(result.scalars().all())
 
     await state.set_state(Registration.waiting_faculty)
-    await message.answer("Fakultet yoki bo'limingizni tanlang:", reply_markup=faculty_keyboard(faculties))
+    await callback.message.edit_reply_markup(reply_markup=None)
+    label = "Fakultetingizni" if unit_type == "faculty" else "Bo'limingizni"
+    await callback.message.answer(f"{label} tanlang:", reply_markup=faculty_keyboard(faculties))
+    await callback.answer()
 
 
 @router.callback_query(StateFilter(Registration.waiting_faculty), F.data.startswith("faculty:"))
@@ -126,11 +144,27 @@ async def cmd_profile(message: Message, state: FSMContext) -> None:
             await message.answer(f"FISH: {user.full_name}\nTelefon: {user.phone}\nRol: {user.role.value}")
             return
 
-        result = await db.execute(select(Faculty).order_by(Faculty.name))
+    await state.set_state(ProfileChange.waiting_org_unit_type)
+    await message.answer(
+        "Yangi fakultet yoki bo'limga tegishli ekaningizni tanlang:", reply_markup=org_unit_type_keyboard()
+    )
+
+
+@router.callback_query(StateFilter(ProfileChange.waiting_org_unit_type), F.data.startswith("orgtype:"))
+async def handle_profile_org_unit_type(callback: CallbackQuery, state: FSMContext) -> None:
+    unit_type = callback.data.split(":")[1]
+
+    async with async_session_factory() as db:
+        result = await db.execute(
+            select(Faculty).where(Faculty.unit_type == OrgUnitType(unit_type)).order_by(Faculty.name)
+        )
         faculties = list(result.scalars().all())
 
     await state.set_state(ProfileChange.waiting_faculty)
-    await message.answer("Yangi fakultet yoki bo'limingizni tanlang:", reply_markup=faculty_keyboard(faculties))
+    await callback.message.edit_reply_markup(reply_markup=None)
+    label = "Fakultetingizni" if unit_type == "faculty" else "Bo'limingizni"
+    await callback.message.answer(f"{label} tanlang:", reply_markup=faculty_keyboard(faculties))
+    await callback.answer()
 
 
 @router.callback_query(StateFilter(ProfileChange.waiting_faculty), F.data.startswith("faculty:"))

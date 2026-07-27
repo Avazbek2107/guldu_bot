@@ -3,10 +3,12 @@ from aiogram.fsm.state import State, StatesGroup
 
 class Registration(StatesGroup):
     waiting_full_name = State()
+    waiting_org_unit_type = State()
     waiting_faculty = State()
 
 
 class ProfileChange(StatesGroup):
+    waiting_org_unit_type = State()
     waiting_faculty = State()
 
 

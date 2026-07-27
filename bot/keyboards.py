@@ -50,13 +50,18 @@ def remove_keyboard() -> ReplyKeyboardRemove:
     return ReplyKeyboardRemove()
 
 
+def org_unit_type_keyboard(callback_prefix: str = "orgtype") -> InlineKeyboardMarkup:
+    builder = InlineKeyboardBuilder()
+    builder.button(text="🏛 Fakultet", callback_data=f"{callback_prefix}:faculty")
+    builder.button(text="🏢 Bo'lim", callback_data=f"{callback_prefix}:department")
+    builder.adjust(1)
+    return builder.as_markup()
+
+
 def faculty_keyboard(faculties: list, callback_prefix: str = "faculty") -> InlineKeyboardMarkup:
     builder = InlineKeyboardBuilder()
     for faculty in faculties:
-        label = faculty.name
-        if getattr(faculty, "unit_type", None) == "department":
-            label = f"{faculty.name} (bo'lim)"
-        builder.button(text=label, callback_data=f"{callback_prefix}:{faculty.id}")
+        builder.button(text=faculty.name, callback_data=f"{callback_prefix}:{faculty.id}")
     builder.adjust(1)
     return builder.as_markup()
 
