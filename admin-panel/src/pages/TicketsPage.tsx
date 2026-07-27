@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from "react";
 import { useSearchParams } from "react-router-dom";
 import {
   Button,
+  Card,
   Input,
   Modal,
   Select,
@@ -18,6 +19,7 @@ import { listFaculties } from "../api/faculties";
 import { listInventory } from "../api/inventory";
 import { listUsers } from "../api/users";
 import { ActionsMenu, type ActionItem } from "../components/ActionsMenu";
+import { CARD_STYLE } from "../theme";
 import { useAuth } from "../auth/AuthContext";
 import {
   CATEGORY_LABELS_UZ,
@@ -206,6 +208,7 @@ export function TicketsPage() {
         </Button>
       </Space>
 
+      <Card style={CARD_STYLE}>
       <Table
         rowKey="id"
         loading={loading}
@@ -267,6 +270,7 @@ export function TicketsPage() {
           },
         ]}
       />
+      </Card>
 
       <Modal
         title={`Arizani yopish — #${closeTarget?.ticket_number ?? ""}`}

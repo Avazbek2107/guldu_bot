@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState, type ChangeEvent } from "react";
 import {
   Button,
+  Card,
   Form,
   Input,
   Modal,
@@ -24,6 +25,7 @@ import {
 } from "../api/inventory";
 import { listFaculties } from "../api/faculties";
 import { ActionsMenu } from "../components/ActionsMenu";
+import { CARD_STYLE } from "../theme";
 import { orgUnitLabel, type FacultyOut, type InventoryItemOut, type RepairHistoryItem } from "../types";
 
 const STATUS_OPTIONS = [
@@ -198,6 +200,7 @@ export function InventoryPage() {
         </Button>
       </Space>
 
+      <Card style={CARD_STYLE}>
       <Table
         rowKey="id"
         loading={loading}
@@ -269,6 +272,7 @@ export function InventoryPage() {
           },
         ]}
       />
+      </Card>
 
       <Modal
         title="Yangi inventar"

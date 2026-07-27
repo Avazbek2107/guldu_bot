@@ -1,8 +1,9 @@
 import { useEffect, useState } from "react";
-import { Button, Form, Input, Modal, Space, Table, message } from "antd";
+import { Button, Card, Form, Input, Modal, Space, Table, message } from "antd";
 import { PlusOutlined } from "@ant-design/icons";
 import { createFaculty, listFaculties, updateFaculty } from "../api/faculties";
 import { listUsers } from "../api/users";
+import { CARD_STYLE } from "../theme";
 import type { FacultyOut, UserOut } from "../types";
 
 export function FacultiesPage() {
@@ -80,6 +81,7 @@ export function FacultiesPage() {
         </Button>
       </Space>
 
+      <Card style={CARD_STYLE}>
       <Table
         rowKey="id"
         loading={loading}
@@ -116,6 +118,7 @@ export function FacultiesPage() {
           },
         ]}
       />
+      </Card>
 
       <Modal
         title="Yangi fakultet"

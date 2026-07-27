@@ -1,8 +1,9 @@
 import { useEffect, useState } from "react";
-import { Form, Input, InputNumber, Modal, Select, Space, Table, Tag, message } from "antd";
+import { Card, Form, Input, InputNumber, Modal, Select, Space, Table, Tag, message } from "antd";
 import { blockUser, deleteUser, listUsers, unblockUser, updateUser } from "../api/users";
 import { listFaculties } from "../api/faculties";
 import { ActionsMenu } from "../components/ActionsMenu";
+import { CARD_STYLE } from "../theme";
 import { orgUnitLabel, type FacultyOut, type UserOut } from "../types";
 
 export function EndUsersPage() {
@@ -93,6 +94,7 @@ export function EndUsersPage() {
         />
       </Space>
 
+      <Card style={CARD_STYLE}>
       <Table
         rowKey="id"
         scroll={{ x: "max-content" }}
@@ -105,8 +107,10 @@ export function EndUsersPage() {
           {
             title: "Telegram",
             dataIndex: "telegram_id",
-            render: (v: number | null) =>
-              v != null ? <Tag color="green">Bog'langan</Tag> : <Tag>Bog'lanmagan</Tag>,
+            onCell: (record: UserOut) => ({
+              style: { background: record.telegram_id != null ? "#e6f7e6" : "#fdecec" },
+            }),
+            render: (v: number | null) => (v != null ? "Bog'langan" : "Bog'lanmagan"),
           },
           {
             title: "Holat",
@@ -158,6 +162,7 @@ export function EndUsersPage() {
           },
         ]}
       />
+      </Card>
 
       <Modal
         title={`Tahrirlash — ${editTarget?.full_name ?? ""}`}

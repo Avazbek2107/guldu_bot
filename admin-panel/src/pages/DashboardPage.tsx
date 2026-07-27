@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import type { CSSProperties, ReactNode } from "react";
+import type { ReactNode } from "react";
 import { useNavigate } from "react-router-dom";
 import { Card, Col, Row, Statistic, Spin, Table, Tag } from "antd";
 import {
@@ -27,6 +27,7 @@ import {
   YAxis,
 } from "recharts";
 import { fetchDashboardStats } from "../api/stats";
+import { CARD_STYLE } from "../theme";
 import type { DashboardStats } from "../types";
 import { CATEGORY_LABELS_UZ } from "../types";
 
@@ -63,12 +64,6 @@ const INVENTORY_STATUS_COLORS: Record<string, string> = {
   Nosoz: RED,
   "Ta'mirlanmoqda": YELLOW,
   "Hisobdan chiqarilgan": INK_MUTED,
-};
-
-const CARD_STYLE: CSSProperties = {
-  borderRadius: 14,
-  boxShadow: "0 2px 10px rgba(11,11,11,0.06)",
-  border: "1px solid rgba(11,11,11,0.06)",
 };
 
 function KpiIcon({ icon, tint }: { icon: ReactNode; tint: string }) {

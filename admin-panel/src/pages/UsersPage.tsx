@@ -1,7 +1,8 @@
 import { useEffect, useState } from "react";
-import { Button, Form, Input, InputNumber, Modal, Select, Space, Table, Tag, message } from "antd";
+import { Button, Card, Form, Input, InputNumber, Modal, Select, Space, Table, Tag, message } from "antd";
 import { MinusCircleOutlined, PlusOutlined } from "@ant-design/icons";
 import { ActionsMenu } from "../components/ActionsMenu";
+import { CARD_STYLE } from "../theme";
 import {
   blockUser,
   createUser,
@@ -229,6 +230,7 @@ export function UsersPage() {
         </Button>
       </Space>
 
+      <Card style={CARD_STYLE}>
       <Table
         rowKey="id"
         loading={loading}
@@ -240,10 +242,12 @@ export function UsersPage() {
           { title: "Telefon", dataIndex: "phone" },
           { title: "Rol", dataIndex: "role", render: (v: UserRole) => ROLE_LABELS_UZ[v] },
           {
-            title: "Fakultet(lar)",
+            title: "Biriktirilgan hudud",
             key: "faculties",
             render: (_: unknown, record: UserOut) => {
-              const assignments = record.faculty_assignments ?? [];
+              const assignments = [...(record.faculty_assignments ?? [])].sort((a, b) =>
+                a.role === b.role ? 0 : a.role === "technician_main" ? -1 : 1,
+              );
               if (assignments.length === 0) return "-";
               return (
                 <Space orientation="vertical" size={4}>
@@ -259,8 +263,10 @@ export function UsersPage() {
           {
             title: "Telegram",
             dataIndex: "telegram_id",
-            render: (v: number | null) =>
-              v != null ? <Tag color="green">Bog'langan ({v})</Tag> : <Tag>Bog'lanmagan</Tag>,
+            onCell: (record: UserOut) => ({
+              style: { background: record.telegram_id != null ? "#e6f7e6" : "#fdecec" },
+            }),
+            render: (v: number | null) => (v != null ? "Bog'langan" : "Bog'lanmagan"),
           },
           {
             title: "Holat",
@@ -315,6 +321,7 @@ export function UsersPage() {
           },
         ]}
       />
+      </Card>
 
       <Modal
         title="Yangi xodim"
