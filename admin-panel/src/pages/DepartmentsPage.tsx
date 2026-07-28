@@ -4,9 +4,15 @@ import { DownloadOutlined, PlusOutlined, UploadOutlined } from "@ant-design/icon
 import { createFaculty, exportFaculties, importFaculties, listFaculties, updateFaculty } from "../api/faculties";
 import { listUsers } from "../api/users";
 import { CARD_STYLE } from "../theme";
+import { useAuth } from "../auth/AuthContext";
+import { hasPermission } from "../auth/permissions";
 import type { FacultyOut, UserOut } from "../types";
 
 export function DepartmentsPage() {
+  const { user } = useAuth();
+  const canCreate = hasPermission(user, "departments", "create");
+  const canEdit = hasPermission(user, "departments", "edit");
+
   const [departments, setDepartments] = useState<FacultyOut[]>([]);
   const [technicians, setTechnicians] = useState<UserOut[]>([]);
   const [loading, setLoading] = useState(true);
@@ -123,12 +129,16 @@ export function DepartmentsPage() {
   return (
     <div>
       <Space style={{ marginBottom: 16 }} wrap>
-        <Button type="primary" icon={<PlusOutlined />} onClick={() => setCreateOpen(true)}>
-          Yangi bo'lim
-        </Button>
-        <Button icon={<UploadOutlined />} loading={importLoading} onClick={() => fileInputRef.current?.click()}>
-          Import (Excel)
-        </Button>
+        {canCreate && (
+          <Button type="primary" icon={<PlusOutlined />} onClick={() => setCreateOpen(true)}>
+            Yangi bo'lim
+          </Button>
+        )}
+        {canCreate && (
+          <Button icon={<UploadOutlined />} loading={importLoading} onClick={() => fileInputRef.current?.click()}>
+            Import (Excel)
+          </Button>
+        )}
         <input
           ref={fileInputRef}
           type="file"
@@ -159,23 +169,27 @@ export function DepartmentsPage() {
             key: "backup",
             render: (_: unknown, record: FacultyOut) => techniciansFor(record.id, "technician_backup"),
           },
-          {
-            title: "Amallar",
-            key: "actions",
-            render: (_: unknown, record: FacultyOut) => (
-              <Space>
-                <Button
-                  size="small"
-                  onClick={() => {
-                    setRenameTarget(record);
-                    renameForm.setFieldsValue({ name: record.name });
-                  }}
-                >
-                  Nomini o'zgartirish
-                </Button>
-              </Space>
-            ),
-          },
+          ...(canEdit
+            ? [
+                {
+                  title: "Amallar",
+                  key: "actions",
+                  render: (_: unknown, record: FacultyOut) => (
+                    <Space>
+                      <Button
+                        size="small"
+                        onClick={() => {
+                          setRenameTarget(record);
+                          renameForm.setFieldsValue({ name: record.name });
+                        }}
+                      >
+                        Nomini o'zgartirish
+                      </Button>
+                    </Space>
+                  ),
+                },
+              ]
+            : []),
         ]}
       />
       </Card>

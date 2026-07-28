@@ -27,6 +27,8 @@ import { listFaculties } from "../api/faculties";
 import { listUsers } from "../api/users";
 import { ActionsMenu } from "../components/ActionsMenu";
 import { CARD_STYLE } from "../theme";
+import { useAuth } from "../auth/AuthContext";
+import { hasPermission } from "../auth/permissions";
 import { orgUnitLabel, type FacultyOut, type InventoryItemOut, type RepairHistoryItem, type UserOut } from "../types";
 
 const STATUS_OPTIONS = [
@@ -44,6 +46,12 @@ const STATUS_COLORS: Record<string, string> = {
 };
 
 export function InventoryPage() {
+  const { user } = useAuth();
+  const isTechnician = user?.role === "technician_main" || user?.role === "technician_backup";
+  const canCreate = isTechnician || hasPermission(user, "inventory", "create");
+  const canEdit = isTechnician || hasPermission(user, "inventory", "edit");
+  const canDelete = isTechnician || hasPermission(user, "inventory", "delete");
+
   const [items, setItems] = useState<InventoryItemOut[]>([]);
   const [faculties, setFaculties] = useState<FacultyOut[]>([]);
   const [technicians, setTechnicians] = useState<UserOut[]>([]);
@@ -209,12 +217,16 @@ export function InventoryPage() {
           onChange={setFacultyFilter}
           options={faculties.map((f) => ({ value: f.id, label: orgUnitLabel(f) }))}
         />
-        <Button type="primary" icon={<PlusOutlined />} onClick={() => setCreateOpen(true)}>
-          Yangi inventar
-        </Button>
-        <Button icon={<UploadOutlined />} loading={importLoading} onClick={() => fileInputRef.current?.click()}>
-          Import (Excel)
-        </Button>
+        {canCreate && (
+          <Button type="primary" icon={<PlusOutlined />} onClick={() => setCreateOpen(true)}>
+            Yangi inventar
+          </Button>
+        )}
+        {canCreate && (
+          <Button icon={<UploadOutlined />} loading={importLoading} onClick={() => fileInputRef.current?.click()}>
+            Import (Excel)
+          </Button>
+        )}
         <input
           ref={fileInputRef}
           type="file"
@@ -272,33 +284,41 @@ export function InventoryPage() {
                     icon: <HistoryOutlined />,
                     onClick: () => openHistory(record),
                   },
-                  {
-                    key: "edit",
-                    label: "Tahrirlash",
-                    onClick: () => {
-                      setEditTarget(record);
-                      editForm.setFieldsValue({
-                        faculty_id: record.faculty_id,
-                        sub_unit: record.sub_unit ?? undefined,
-                        room: record.room ?? undefined,
-                        inventory_number: record.inventory_number ?? undefined,
-                        uzasbo: record.uzasbo ?? undefined,
-                        inventory_type: record.inventory_type ?? undefined,
-                        model: record.model ?? undefined,
-                        status: record.status,
-                        internet_connection: record.internet_connection ?? undefined,
-                        responsible_person: record.responsible_person ?? undefined,
-                        assigned_technician_id: record.assigned_technician_id ?? undefined,
-                      });
-                    },
-                  },
-                  {
-                    key: "delete",
-                    label: "O'chirish",
-                    danger: true,
-                    confirmTitle: "O'chirishni tasdiqlaysizmi?",
-                    onClick: () => handleDelete(record),
-                  },
+                  ...(canEdit
+                    ? [
+                        {
+                          key: "edit",
+                          label: "Tahrirlash",
+                          onClick: () => {
+                            setEditTarget(record);
+                            editForm.setFieldsValue({
+                              faculty_id: record.faculty_id,
+                              sub_unit: record.sub_unit ?? undefined,
+                              room: record.room ?? undefined,
+                              inventory_number: record.inventory_number ?? undefined,
+                              uzasbo: record.uzasbo ?? undefined,
+                              inventory_type: record.inventory_type ?? undefined,
+                              model: record.model ?? undefined,
+                              status: record.status,
+                              internet_connection: record.internet_connection ?? undefined,
+                              responsible_person: record.responsible_person ?? undefined,
+                              assigned_technician_id: record.assigned_technician_id ?? undefined,
+                            });
+                          },
+                        },
+                      ]
+                    : []),
+                  ...(canDelete
+                    ? [
+                        {
+                          key: "delete",
+                          label: "O'chirish",
+                          danger: true,
+                          confirmTitle: "O'chirishni tasdiqlaysizmi?",
+                          onClick: () => handleDelete(record),
+                        },
+                      ]
+                    : []),
                 ]}
               />
             ),

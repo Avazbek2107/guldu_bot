@@ -21,6 +21,7 @@ import { listUsers } from "../api/users";
 import { ActionsMenu, type ActionItem } from "../components/ActionsMenu";
 import { CARD_STYLE } from "../theme";
 import { useAuth } from "../auth/AuthContext";
+import { hasPermission } from "../auth/permissions";
 import {
   CATEGORY_LABELS_UZ,
   orgUnitLabel,
@@ -43,6 +44,8 @@ const STATUS_COLORS: Record<TicketStatus, string> = {
 export function TicketsPage() {
   const { user } = useAuth();
   const isSuperAdmin = user?.role === "super_admin";
+  const isTechnician = user?.role === "technician_main" || user?.role === "technician_backup";
+  const canEdit = isTechnician || hasPermission(user, "tickets", "edit");
   const [searchParams] = useSearchParams();
 
   const [tickets, setTickets] = useState<TicketOut[]>([]);
@@ -247,7 +250,7 @@ export function TicketsPage() {
             width: 96,
             render: (_: unknown, record: TicketOut) => {
               const menuItems: ActionItem[] =
-                record.status !== "closed"
+                record.status !== "closed" && canEdit
                   ? [
                       { key: "close", label: "Yopish", onClick: () => openCloseModal(record) },
                       { key: "reassign", label: "Qayta yo'naltirish", onClick: () => setReassignTarget(record) },

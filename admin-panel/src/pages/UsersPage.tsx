@@ -14,6 +14,8 @@ import {
   type FacultyAssignmentInput,
 } from "../api/users";
 import { listFaculties } from "../api/faculties";
+import { useAuth } from "../auth/AuthContext";
+import { hasPermission } from "../auth/permissions";
 import {
   orgUnitLabel,
   ROLE_LABELS_UZ,
@@ -22,6 +24,13 @@ import {
   type UserOut,
   type UserRole,
 } from "../types";
+
+function canManageTargetRole(currentUserRole: UserRole | undefined, targetRole: UserRole): boolean {
+  if (targetRole === "admin" || targetRole === "super_admin") {
+    return currentUserRole === "super_admin";
+  }
+  return true;
+}
 
 const EMPLOYEE_ROLES: UserRole[] = ["technician_main", "technician_backup", "admin", "super_admin"];
 const TECHNICIAN_ROLES: UserRole[] = ["technician_main", "technician_backup"];
@@ -116,6 +125,15 @@ function FacultyAssignmentsList({ faculties }: { faculties: FacultyOut[] }) {
 }
 
 export function UsersPage() {
+  const { user: currentUser } = useAuth();
+  const isSuperAdminUser = currentUser?.role === "super_admin";
+  const canCreate = hasPermission(currentUser, "users", "create");
+  const canEditBase = hasPermission(currentUser, "users", "edit");
+  const canDeleteBase = hasPermission(currentUser, "users", "delete");
+  const availableRoleOptions = isSuperAdminUser
+    ? UI_ROLE_OPTIONS
+    : UI_ROLE_OPTIONS.filter((o) => o.value === "technician");
+
   const [users, setUsers] = useState<UserOut[]>([]);
   const [faculties, setFaculties] = useState<FacultyOut[]>([]);
   const [loading, setLoading] = useState(true);
@@ -239,9 +257,11 @@ export function UsersPage() {
           onChange={setRoleFilter}
           options={EMPLOYEE_ROLES.map((r) => ({ value: r, label: ROLE_LABELS_UZ[r] }))}
         />
-        <Button type="primary" icon={<PlusOutlined />} onClick={() => setCreateOpen(true)}>
-          Yangi xodim
-        </Button>
+        {canCreate && (
+          <Button type="primary" icon={<PlusOutlined />} onClick={() => setCreateOpen(true)}>
+            Yangi xodim
+          </Button>
+        )}
       </Space>
 
       <Card style={CARD_STYLE}>
@@ -306,41 +326,59 @@ export function UsersPage() {
             key: "actions",
             fixed: "right",
             width: 72,
-            render: (_: unknown, record: UserOut) => (
-              <ActionsMenu
-                items={[
-                  {
-                    key: "edit",
-                    label: "Tahrirlash",
-                    onClick: () => {
-                      setEditTarget(record);
-                      editForm.setFieldsValue({
-                        full_name: record.full_name,
-                        phone: record.phone,
-                        telegram_id: record.telegram_id ?? undefined,
-                        faculty_assignments: (record.faculty_assignments ?? []).map((a) => ({
-                          faculty_id: a.faculty_id,
-                          role: a.role,
-                        })),
-                        permissions: record.permissions ?? {},
-                      });
-                    },
-                  },
-                  {
-                    key: "block",
-                    label: record.is_blocked ? "Blokdan chiqarish" : "Bloklash",
-                    onClick: () => handleToggleBlock(record),
-                  },
-                  {
-                    key: "delete",
-                    label: "O'chirish",
-                    danger: true,
-                    confirmTitle: "O'chirishni tasdiqlaysizmi?",
-                    onClick: () => handleDelete(record),
-                  },
-                ]}
-              />
-            ),
+            render: (_: unknown, record: UserOut) => {
+              const canManageTarget = canManageTargetRole(currentUser?.role, record.role);
+              const canEdit = canEditBase && canManageTarget;
+              const canDelete = canDeleteBase && canManageTarget;
+              if (!canEdit && !canDelete) return null;
+              return (
+                <ActionsMenu
+                  items={[
+                    ...(canEdit
+                      ? [
+                          {
+                            key: "edit",
+                            label: "Tahrirlash",
+                            onClick: () => {
+                              setEditTarget(record);
+                              editForm.setFieldsValue({
+                                full_name: record.full_name,
+                                phone: record.phone,
+                                telegram_id: record.telegram_id ?? undefined,
+                                faculty_assignments: (record.faculty_assignments ?? []).map((a) => ({
+                                  faculty_id: a.faculty_id,
+                                  role: a.role,
+                                })),
+                                permissions: record.permissions ?? {},
+                              });
+                            },
+                          },
+                        ]
+                      : []),
+                    ...(canEdit
+                      ? [
+                          {
+                            key: "block",
+                            label: record.is_blocked ? "Blokdan chiqarish" : "Bloklash",
+                            onClick: () => handleToggleBlock(record),
+                          },
+                        ]
+                      : []),
+                    ...(canDelete
+                      ? [
+                          {
+                            key: "delete",
+                            label: "O'chirish",
+                            danger: true,
+                            confirmTitle: "O'chirishni tasdiqlaysizmi?",
+                            onClick: () => handleDelete(record),
+                          },
+                        ]
+                      : []),
+                  ]}
+                />
+              );
+            },
           },
         ]}
       />
@@ -383,7 +421,7 @@ export function UsersPage() {
             <Input.Password />
           </Form.Item>
           <Form.Item name="uiRole" label="Rol" rules={[{ required: true }]}>
-            <Select options={UI_ROLE_OPTIONS} />
+            <Select options={availableRoleOptions} />
           </Form.Item>
           <Form.Item
             noStyle

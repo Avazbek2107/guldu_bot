@@ -4,9 +4,15 @@ import { blockUser, deleteUser, listUsers, unblockUser, updateUser } from "../ap
 import { listFaculties } from "../api/faculties";
 import { ActionsMenu } from "../components/ActionsMenu";
 import { CARD_STYLE } from "../theme";
+import { useAuth } from "../auth/AuthContext";
+import { hasPermission } from "../auth/permissions";
 import { orgUnitLabel, type FacultyOut, type UserOut } from "../types";
 
 export function EndUsersPage() {
+  const { user: currentUser } = useAuth();
+  const canEdit = hasPermission(currentUser, "end_users", "edit");
+  const canDelete = hasPermission(currentUser, "end_users", "delete");
+
   const [users, setUsers] = useState<UserOut[]>([]);
   const [faculties, setFaculties] = useState<FacultyOut[]>([]);
   const [loading, setLoading] = useState(true);
@@ -136,34 +142,47 @@ export function EndUsersPage() {
             key: "actions",
             fixed: "right",
             width: 72,
-            render: (_: unknown, record: UserOut) => (
-              <ActionsMenu
+            render: (_: unknown, record: UserOut) =>
+              !canEdit && !canDelete ? null : (
+                <ActionsMenu
                 items={[
-                  {
-                    key: "edit",
-                    label: "Tahrirlash",
-                    onClick: () => {
-                      setEditTarget(record);
-                      editForm.setFieldsValue({
-                        full_name: record.full_name,
-                        phone: record.phone,
-                        faculty_id: record.faculty_id ?? undefined,
-                        telegram_id: record.telegram_id ?? undefined,
-                      });
-                    },
-                  },
-                  {
-                    key: "block",
-                    label: record.is_blocked ? "Blokdan chiqarish" : "Bloklash",
-                    onClick: () => handleToggleBlock(record),
-                  },
-                  {
-                    key: "delete",
-                    label: "O'chirish",
-                    danger: true,
-                    confirmTitle: "O'chirishni tasdiqlaysizmi?",
-                    onClick: () => handleDelete(record),
-                  },
+                  ...(canEdit
+                    ? [
+                        {
+                          key: "edit",
+                          label: "Tahrirlash",
+                          onClick: () => {
+                            setEditTarget(record);
+                            editForm.setFieldsValue({
+                              full_name: record.full_name,
+                              phone: record.phone,
+                              faculty_id: record.faculty_id ?? undefined,
+                              telegram_id: record.telegram_id ?? undefined,
+                            });
+                          },
+                        },
+                      ]
+                    : []),
+                  ...(canEdit
+                    ? [
+                        {
+                          key: "block",
+                          label: record.is_blocked ? "Blokdan chiqarish" : "Bloklash",
+                          onClick: () => handleToggleBlock(record),
+                        },
+                      ]
+                    : []),
+                  ...(canDelete
+                    ? [
+                        {
+                          key: "delete",
+                          label: "O'chirish",
+                          danger: true,
+                          confirmTitle: "O'chirishni tasdiqlaysizmi?",
+                          onClick: () => handleDelete(record),
+                        },
+                      ]
+                    : []),
                 ]}
               />
             ),
