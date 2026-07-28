@@ -55,12 +55,19 @@ def _resource_for_role(role: UserRole) -> str:
     return "end_users" if role == UserRole.FACULTY_STAFF else "users"
 
 
-def _can_manage_target_role(current_user: User, target_role: UserRole) -> bool:
-    # Even an Admin granted full "users" CRUD permission must never create, edit,
-    # block or delete a Super Admin or fellow Admin account — that would let a
-    # delegated Admin escalate their own (or an ally's) privileges. Only a real
-    # Super Admin may manage accounts at this tier.
-    if target_role in (UserRole.SUPER_ADMIN, UserRole.ADMIN):
+def _can_manage_target_role(current_user: User, target_role: UserRole, action: str = "manage") -> bool:
+    # A Super Admin account can never be created, edited, blocked or deleted by
+    # anyone but a real Super Admin — there's only ever meant to be one, bootstrapped
+    # directly in the database, never through the panel.
+    if target_role == UserRole.SUPER_ADMIN:
+        return current_user.role == UserRole.SUPER_ADMIN
+    if target_role == UserRole.ADMIN:
+        # Admins may create fellow Admin accounts (subject to the caller's own
+        # has_permission("users","create") check), but only a Super Admin may
+        # edit, block, unblock or delete an existing Admin account — e.g. change
+        # its password or remove it.
+        if action == "create":
+            return True
         return current_user.role == UserRole.SUPER_ADMIN
     return True
 
@@ -126,7 +133,7 @@ async def create_user(
     payload: UserCreate, db: AsyncSession = Depends(get_db), current_user: User = Depends(get_current_user)
 ):
     if not has_permission(current_user, _resource_for_role(payload.role), "create") or not _can_manage_target_role(
-        current_user, payload.role
+        current_user, payload.role, action="create"
     ):
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Bu amal uchun ruxsatingiz yo'q")
     user = User(

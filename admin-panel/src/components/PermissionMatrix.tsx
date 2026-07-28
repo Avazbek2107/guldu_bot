@@ -6,17 +6,15 @@ import {
   type PermissionResource,
 } from "../types";
 
-const ACTIONS_BY_RESOURCE: Record<PermissionResource, PermissionAction[]> = {
-  dashboard: ["view"],
-  tickets: ["view", "edit"],
-  inventory: ["view", "create", "edit", "delete"],
-  users: ["view", "create", "edit", "delete"],
-  end_users: ["view", "create", "edit", "delete"],
-  faculties: ["view", "create", "edit"],
-  departments: ["view", "create", "edit"],
-};
-
-const RESOURCE_ORDER = Object.keys(ACTIONS_BY_RESOURCE) as PermissionResource[];
+const RESOURCE_ORDER: PermissionResource[] = [
+  "dashboard",
+  "tickets",
+  "inventory",
+  "users",
+  "end_users",
+  "faculties",
+  "departments",
+];
 const ALL_ACTIONS: PermissionAction[] = ["view", "create", "edit", "delete"];
 
 export type PermissionsValue = Partial<Record<PermissionResource, PermissionAction[]>>;
@@ -53,21 +51,14 @@ export function PermissionMatrix({
           {RESOURCE_ORDER.map((resource) => (
             <tr key={resource} style={{ borderTop: "1px solid #f0f0f0" }}>
               <td style={{ padding: "6px 12px" }}>{PERMISSION_RESOURCE_LABELS_UZ[resource]}</td>
-              {ALL_ACTIONS.map((action) => {
-                const supported = ACTIONS_BY_RESOURCE[resource].includes(action);
-                return (
-                  <td key={action} style={{ textAlign: "center", padding: "6px 12px" }}>
-                    {supported ? (
-                      <Checkbox
-                        checked={(current[resource] ?? []).includes(action)}
-                        onChange={(e) => toggle(resource, action, e.target.checked)}
-                      />
-                    ) : (
-                      "-"
-                    )}
-                  </td>
-                );
-              })}
+              {ALL_ACTIONS.map((action) => (
+                <td key={action} style={{ textAlign: "center", padding: "6px 12px" }}>
+                  <Checkbox
+                    checked={(current[resource] ?? []).includes(action)}
+                    onChange={(e) => toggle(resource, action, e.target.checked)}
+                  />
+                </td>
+              ))}
             </tr>
           ))}
         </tbody>

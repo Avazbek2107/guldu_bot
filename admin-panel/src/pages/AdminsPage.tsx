@@ -6,6 +6,7 @@ import { PermissionMatrix, type PermissionsValue } from "../components/Permissio
 import { CARD_STYLE } from "../theme";
 import { blockUser, createUser, deleteUser, listUsers, unblockUser, updateUser } from "../api/users";
 import { useAuth } from "../auth/AuthContext";
+import { hasPermission } from "../auth/permissions";
 import { PERMISSION_RESOURCE_LABELS_UZ, type PermissionResource, type UserOut } from "../types";
 
 interface CreateFormValues {
@@ -36,10 +37,11 @@ function permissionsSummary(permissions: UserOut["permissions"]): string {
 export function AdminsPage() {
   const { user: currentUser } = useAuth();
   const isSuperAdminUser = currentUser?.role === "super_admin";
-  // Only a Super Admin may create/edit/block/delete Admin accounts — this
-  // mirrors a backend safeguard (_can_manage_target_role) that always
-  // rejects such changes from a fellow Admin, so the controls are hidden
-  // rather than shown-then-403'd.
+  // Admins with "users" create permission may add fellow Admin accounts, but
+  // only a Super Admin may edit, block, unblock or delete an existing one
+  // (change its password, remove it) — this mirrors the backend safeguard
+  // (_can_manage_target_role) so the controls are hidden rather than shown-then-403'd.
+  const canCreate = hasPermission(currentUser, "users", "create");
   const canManage = isSuperAdminUser;
 
   const [admins, setAdmins] = useState<UserOut[]>([]);
@@ -137,7 +139,7 @@ export function AdminsPage() {
   return (
     <div>
       <Space style={{ marginBottom: 16 }} wrap>
-        {canManage && (
+        {canCreate && (
           <Button type="primary" icon={<PlusOutlined />} onClick={() => setCreateOpen(true)}>
             Yangi admin
           </Button>
