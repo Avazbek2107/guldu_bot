@@ -28,6 +28,7 @@ import {
   DownOutlined,
   EditOutlined,
   CameraOutlined,
+  CrownOutlined,
 } from "@ant-design/icons";
 import { Outlet, useLocation, useNavigate } from "react-router-dom";
 import { updateProfile, uploadAvatar } from "../api/auth";
@@ -150,6 +151,7 @@ export function AppLayout() {
     canSeeTickets ? { key: "/tickets", icon: <UnorderedListOutlined />, label: "Arizalar" } : null,
     canSeeInventory ? { key: "/inventory", icon: <DatabaseOutlined />, label: "Inventar" } : null,
     hasPermission(user, "users") ? { key: "/users", icon: <TeamOutlined />, label: "Xodimlar" } : null,
+    hasPermission(user, "users") ? { key: "/admins", icon: <CrownOutlined />, label: "Boshqaruv" } : null,
     hasPermission(user, "end_users")
       ? { key: "/end-users", icon: <UserOutlined />, label: "Foydalanuvchilar" }
       : null,

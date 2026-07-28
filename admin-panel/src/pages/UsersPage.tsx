@@ -2,7 +2,6 @@ import { useEffect, useState } from "react";
 import { Button, Card, Form, Input, InputNumber, Modal, Select, Space, Table, Tag, message } from "antd";
 import { MinusCircleOutlined, PlusOutlined } from "@ant-design/icons";
 import { ActionsMenu } from "../components/ActionsMenu";
-import { PermissionMatrix, type PermissionsValue } from "../components/PermissionMatrix";
 import { CARD_STYLE } from "../theme";
 import {
   blockUser,
@@ -25,23 +24,7 @@ import {
   type UserRole,
 } from "../types";
 
-function canManageTargetRole(currentUserRole: UserRole | undefined, targetRole: UserRole): boolean {
-  if (targetRole === "admin" || targetRole === "super_admin") {
-    return currentUserRole === "super_admin";
-  }
-  return true;
-}
-
-const EMPLOYEE_ROLES: UserRole[] = ["technician_main", "technician_backup", "admin", "super_admin"];
 const TECHNICIAN_ROLES: UserRole[] = ["technician_main", "technician_backup"];
-
-type UiRole = "technician" | "admin" | "super_admin";
-
-const UI_ROLE_OPTIONS: { value: UiRole; label: string }[] = [
-  { value: "technician", label: "Texnik xodim" },
-  { value: "admin", label: "Admin" },
-  { value: "super_admin", label: "Super Admin" },
-];
 
 const FACULTY_ROLE_OPTIONS: { value: TechnicianRole; label: string }[] = [
   { value: "technician_main", label: "Asosiy" },
@@ -57,9 +40,7 @@ interface CreateFormValues {
   phone: string;
   username: string;
   password: string;
-  uiRole: UiRole;
-  faculty_assignments?: FacultyAssignmentInput[];
-  permissions?: PermissionsValue;
+  faculty_assignments: FacultyAssignmentInput[];
   telegram_id?: number;
 }
 
@@ -68,8 +49,7 @@ interface EditFormValues {
   phone: string;
   password?: string;
   telegram_id?: number;
-  faculty_assignments?: FacultyAssignmentInput[];
-  permissions?: PermissionsValue;
+  faculty_assignments: FacultyAssignmentInput[];
 }
 
 function FacultyAssignmentsList({ faculties }: { faculties: FacultyOut[] }) {
@@ -126,16 +106,9 @@ function FacultyAssignmentsList({ faculties }: { faculties: FacultyOut[] }) {
 
 export function UsersPage() {
   const { user: currentUser } = useAuth();
-  const isSuperAdminUser = currentUser?.role === "super_admin";
   const canCreate = hasPermission(currentUser, "users", "create");
-  const canEditBase = hasPermission(currentUser, "users", "edit");
-  const canDeleteBase = hasPermission(currentUser, "users", "delete");
-  const availableRoleOptions = isSuperAdminUser
-    ? UI_ROLE_OPTIONS
-    : UI_ROLE_OPTIONS.filter((o) => o.value === "technician");
-  const visibleEmployeeRoles = isSuperAdminUser
-    ? EMPLOYEE_ROLES
-    : EMPLOYEE_ROLES.filter((r) => r !== "super_admin");
+  const canEdit = hasPermission(currentUser, "users", "edit");
+  const canDelete = hasPermission(currentUser, "users", "delete");
 
   const [users, setUsers] = useState<UserOut[]>([]);
   const [faculties, setFaculties] = useState<FacultyOut[]>([]);
@@ -151,7 +124,7 @@ export function UsersPage() {
   async function loadUsers() {
     setLoading(true);
     try {
-      setUsers(await listUsers({ role: roleFilter ? [roleFilter] : visibleEmployeeRoles }));
+      setUsers(await listUsers({ role: roleFilter ? [roleFilter] : TECHNICIAN_ROLES }));
     } finally {
       setLoading(false);
     }
@@ -169,21 +142,14 @@ export function UsersPage() {
   async function handleCreate(values: CreateFormValues) {
     setSaving(true);
     try {
-      const assignments = values.uiRole === "technician" ? values.faculty_assignments ?? [] : [];
-      const role: UserRole =
-        values.uiRole === "super_admin"
-          ? "super_admin"
-          : values.uiRole === "admin"
-            ? "admin"
-            : resolveTechnicianRole(assignments);
+      const assignments = values.faculty_assignments ?? [];
       await createUser({
         username: values.username,
         password: values.password,
         full_name: values.full_name,
         phone: values.phone,
-        role,
+        role: resolveTechnicianRole(assignments),
         faculty_assignments: assignments,
-        permissions: values.uiRole === "admin" ? values.permissions ?? {} : null,
         telegram_id: values.telegram_id ?? null,
       });
       message.success("Xodim yaratildi");
@@ -199,8 +165,6 @@ export function UsersPage() {
 
   async function handleEditSave(values: EditFormValues) {
     if (!editTarget) return;
-    const isTechnician = TECHNICIAN_ROLES.includes(editTarget.role);
-    const isAdmin = editTarget.role === "admin";
     setSaving(true);
     try {
       await updateUser(editTarget.id, {
@@ -208,8 +172,7 @@ export function UsersPage() {
         phone: values.phone,
         password: values.password || undefined,
         telegram_id: values.telegram_id ?? null,
-        ...(isTechnician ? { faculty_assignments: values.faculty_assignments ?? [] } : {}),
-        ...(isAdmin ? { permissions: values.permissions ?? {} } : {}),
+        faculty_assignments: values.faculty_assignments ?? [],
       });
       message.success("Saqlandi");
       setEditTarget(null);
@@ -246,9 +209,6 @@ export function UsersPage() {
     }
   }
 
-  const editTargetIsTechnician = editTarget != null && TECHNICIAN_ROLES.includes(editTarget.role);
-  const editTargetIsAdmin = editTarget?.role === "admin";
-
   return (
     <div>
       <Space style={{ marginBottom: 16 }} wrap>
@@ -258,7 +218,7 @@ export function UsersPage() {
           style={{ width: 220 }}
           value={roleFilter}
           onChange={setRoleFilter}
-          options={visibleEmployeeRoles.map((r) => ({ value: r, label: ROLE_LABELS_UZ[r] }))}
+          options={TECHNICIAN_ROLES.map((r) => ({ value: r, label: ROLE_LABELS_UZ[r] }))}
         />
         {canCreate && (
           <Button type="primary" icon={<PlusOutlined />} onClick={() => setCreateOpen(true)}>
@@ -330,9 +290,6 @@ export function UsersPage() {
             fixed: "right",
             width: 72,
             render: (_: unknown, record: UserOut) => {
-              const canManageTarget = canManageTargetRole(currentUser?.role, record.role);
-              const canEdit = canEditBase && canManageTarget;
-              const canDelete = canDeleteBase && canManageTarget;
               if (!canEdit && !canDelete) return null;
               return (
                 <ActionsMenu
@@ -352,7 +309,6 @@ export function UsersPage() {
                                   faculty_id: a.faculty_id,
                                   role: a.role,
                                 })),
-                                permissions: record.permissions ?? {},
                               });
                             },
                           },
@@ -396,7 +352,7 @@ export function UsersPage() {
         okText="Yaratish"
         cancelText="Bekor qilish"
       >
-        <Form form={createForm} layout="vertical" onFinish={handleCreate} initialValues={{ uiRole: "technician" }}>
+        <Form form={createForm} layout="vertical" onFinish={handleCreate}>
           <Form.Item name="full_name" label="FISH" rules={[{ required: true }]}>
             <Input />
           </Form.Item>
@@ -423,31 +379,8 @@ export function UsersPage() {
           >
             <Input.Password />
           </Form.Item>
-          <Form.Item name="uiRole" label="Rol" rules={[{ required: true }]}>
-            <Select options={availableRoleOptions} />
-          </Form.Item>
-          <Form.Item
-            noStyle
-            shouldUpdate={(prev: CreateFormValues, cur: CreateFormValues) => prev.uiRole !== cur.uiRole}
-          >
-            {({ getFieldValue }) => {
-              const uiRole = getFieldValue("uiRole");
-              if (uiRole === "technician") {
-                return (
-                  <Form.Item label="Fakultet biriktirishlar">
-                    <FacultyAssignmentsList faculties={faculties} />
-                  </Form.Item>
-                );
-              }
-              if (uiRole === "admin") {
-                return (
-                  <Form.Item name="permissions" label="Ruxsatlar">
-                    <PermissionMatrix />
-                  </Form.Item>
-                );
-              }
-              return null;
-            }}
+          <Form.Item label="Fakultet biriktirishlar">
+            <FacultyAssignmentsList faculties={faculties} />
           </Form.Item>
           <Form.Item
             name="telegram_id"
@@ -475,16 +408,9 @@ export function UsersPage() {
           <Form.Item name="phone" label="Telefon" rules={[{ required: true }]}>
             <Input />
           </Form.Item>
-          {editTargetIsTechnician && (
-            <Form.Item label="Fakultet biriktirishlar">
-              <FacultyAssignmentsList faculties={faculties} />
-            </Form.Item>
-          )}
-          {editTargetIsAdmin && (
-            <Form.Item name="permissions" label="Ruxsatlar">
-              <PermissionMatrix />
-            </Form.Item>
-          )}
+          <Form.Item label="Fakultet biriktirishlar">
+            <FacultyAssignmentsList faculties={faculties} />
+          </Form.Item>
           <Form.Item
             name="telegram_id"
             label="Telegram ID (ixtiyoriy)"

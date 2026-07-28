@@ -8,6 +8,7 @@ import { LoginPage } from "./pages/LoginPage";
 const DashboardPage = lazy(() => import("./pages/DashboardPage").then((m) => ({ default: m.DashboardPage })));
 const TicketsPage = lazy(() => import("./pages/TicketsPage").then((m) => ({ default: m.TicketsPage })));
 const UsersPage = lazy(() => import("./pages/UsersPage").then((m) => ({ default: m.UsersPage })));
+const AdminsPage = lazy(() => import("./pages/AdminsPage").then((m) => ({ default: m.AdminsPage })));
 const EndUsersPage = lazy(() => import("./pages/EndUsersPage").then((m) => ({ default: m.EndUsersPage })));
 const FacultiesPage = lazy(() => import("./pages/FacultiesPage").then((m) => ({ default: m.FacultiesPage })));
 const DepartmentsPage = lazy(() =>
@@ -59,6 +60,7 @@ function App() {
             </Route>
             <Route element={<ProtectedRoute permission={{ resource: "users" }} />}>
               <Route path="/users" element={<UsersPage />} />
+              <Route path="/admins" element={<AdminsPage />} />
             </Route>
             <Route element={<ProtectedRoute permission={{ resource: "end_users" }} />}>
               <Route path="/end-users" element={<EndUsersPage />} />
