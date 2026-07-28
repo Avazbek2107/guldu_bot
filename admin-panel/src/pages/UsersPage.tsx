@@ -133,6 +133,9 @@ export function UsersPage() {
   const availableRoleOptions = isSuperAdminUser
     ? UI_ROLE_OPTIONS
     : UI_ROLE_OPTIONS.filter((o) => o.value === "technician");
+  const visibleEmployeeRoles = isSuperAdminUser
+    ? EMPLOYEE_ROLES
+    : EMPLOYEE_ROLES.filter((r) => r !== "super_admin");
 
   const [users, setUsers] = useState<UserOut[]>([]);
   const [faculties, setFaculties] = useState<FacultyOut[]>([]);
@@ -148,7 +151,7 @@ export function UsersPage() {
   async function loadUsers() {
     setLoading(true);
     try {
-      setUsers(await listUsers({ role: roleFilter ? [roleFilter] : EMPLOYEE_ROLES }));
+      setUsers(await listUsers({ role: roleFilter ? [roleFilter] : visibleEmployeeRoles }));
     } finally {
       setLoading(false);
     }
@@ -255,7 +258,7 @@ export function UsersPage() {
           style={{ width: 220 }}
           value={roleFilter}
           onChange={setRoleFilter}
-          options={EMPLOYEE_ROLES.map((r) => ({ value: r, label: ROLE_LABELS_UZ[r] }))}
+          options={visibleEmployeeRoles.map((r) => ({ value: r, label: ROLE_LABELS_UZ[r] }))}
         />
         {canCreate && (
           <Button type="primary" icon={<PlusOutlined />} onClick={() => setCreateOpen(true)}>

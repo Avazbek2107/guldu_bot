@@ -95,6 +95,10 @@ async def list_users(
         current_user.role == UserRole.ADMIN and has_permission(current_user, resource, "view")
     ):
         _apply_role_and_faculty_filters()
+        if current_user.role == UserRole.ADMIN:
+            # Admins must never see Super Admin accounts, regardless of the
+            # role filter they request.
+            query = query.where(User.role != UserRole.SUPER_ADMIN)
     elif current_user.role in TECHNICIAN_ROLES:
         # Technicians may only see fellow technicians who share at least one
         # faculty with them (needed for the reassign dropdown), not the full directory.
