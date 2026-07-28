@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Button, Card, Form, Input, InputNumber, Modal, Select, Space, Table, Tag, message } from "antd";
 import { MinusCircleOutlined, PlusOutlined } from "@ant-design/icons";
 import { ActionsMenu } from "../components/ActionsMenu";
@@ -120,13 +120,20 @@ export function UsersPage() {
   const [createForm] = Form.useForm<CreateFormValues>();
   const [editForm] = Form.useForm<EditFormValues>();
   const [saving, setSaving] = useState(false);
+  const requestIdRef = useRef(0);
 
   async function loadUsers() {
+    const requestId = ++requestIdRef.current;
     setLoading(true);
     try {
-      setUsers(await listUsers({ role: roleFilter ? [roleFilter] : TECHNICIAN_ROLES }));
+      const data = await listUsers({ role: roleFilter ? [roleFilter] : TECHNICIAN_ROLES });
+      if (requestId === requestIdRef.current) {
+        setUsers(data);
+      }
     } finally {
-      setLoading(false);
+      if (requestId === requestIdRef.current) {
+        setLoading(false);
+      }
     }
   }
 

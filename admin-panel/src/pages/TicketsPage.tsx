@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useSearchParams } from "react-router-dom";
 import {
   Button,
@@ -46,6 +46,10 @@ export function TicketsPage() {
   const isSuperAdmin = user?.role === "super_admin";
   const isTechnician = user?.role === "technician_main" || user?.role === "technician_backup";
   const canEdit = isTechnician || hasPermission(user, "tickets", "edit");
+  // Super Admin and any Admin granted "tickets" view see every faculty's tickets
+  // (unlike technicians, who are always scoped to their own faculty by the
+  // backend) — so they need the faculty filter/column to tell them apart.
+  const canSeeAllFaculties = isSuperAdmin || hasPermission(user, "tickets");
   const [searchParams] = useSearchParams();
 
   const [tickets, setTickets] = useState<TicketOut[]>([]);
@@ -67,6 +71,7 @@ export function TicketsPage() {
   const [reassignTarget, setReassignTarget] = useState<TicketOut | null>(null);
   const [reassignTechnicianId, setReassignTechnicianId] = useState<number | undefined>();
   const [actionLoading, setActionLoading] = useState(false);
+  const requestIdRef = useRef(0);
 
   const currentFilters: TicketFilters = {
     faculty_id: facultyFilter,
@@ -75,12 +80,17 @@ export function TicketsPage() {
   };
 
   async function loadTickets() {
+    const requestId = ++requestIdRef.current;
     setLoading(true);
     try {
       const data = await listTickets(currentFilters);
-      setTickets(data);
+      if (requestId === requestIdRef.current) {
+        setTickets(data);
+      }
     } finally {
-      setLoading(false);
+      if (requestId === requestIdRef.current) {
+        setLoading(false);
+      }
     }
   }
 
@@ -177,7 +187,7 @@ export function TicketsPage() {
   return (
     <div>
       <Space style={{ marginBottom: 16 }} wrap>
-        {isSuperAdmin && (
+        {canSeeAllFaculties && (
           <Select
             allowClear
             placeholder="Fakultet"
@@ -221,7 +231,7 @@ export function TicketsPage() {
           { title: "Ariza №", dataIndex: "ticket_number" },
           { title: "FISH", dataIndex: "creator_full_name" },
           { title: "Telefon", dataIndex: "creator_phone" },
-          ...(isSuperAdmin ? [{ title: "Fakultet", dataIndex: "faculty_name" }] : []),
+          ...(canSeeAllFaculties ? [{ title: "Fakultet", dataIndex: "faculty_name" }] : []),
           {
             title: "Toifa",
             dataIndex: "category",

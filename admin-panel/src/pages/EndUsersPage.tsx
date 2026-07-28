@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Card, Form, Input, InputNumber, Modal, Select, Space, Table, Tag, message } from "antd";
 import { blockUser, deleteUser, listUsers, unblockUser, updateUser } from "../api/users";
 import { listFaculties } from "../api/faculties";
@@ -23,13 +23,20 @@ export function EndUsersPage() {
   const [saving, setSaving] = useState(false);
 
   const facultyName = (id: number | null) => faculties.find((f) => f.id === id)?.name ?? "-";
+  const requestIdRef = useRef(0);
 
   async function loadUsers() {
+    const requestId = ++requestIdRef.current;
     setLoading(true);
     try {
-      setUsers(await listUsers({ role: "faculty_staff", faculty_id: facultyFilter }));
+      const data = await listUsers({ role: "faculty_staff", faculty_id: facultyFilter });
+      if (requestId === requestIdRef.current) {
+        setUsers(data);
+      }
     } finally {
-      setLoading(false);
+      if (requestId === requestIdRef.current) {
+        setLoading(false);
+      }
     }
   }
 

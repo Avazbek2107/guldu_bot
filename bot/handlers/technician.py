@@ -88,7 +88,15 @@ async def handle_close_start(callback: CallbackQuery, state: FSMContext) -> None
         if technician is None or ticket is None or not await can_close_ticket(db, ticket, technician):
             await callback.answer("Sizda bu huquq yo'q", show_alert=True)
             return
+        if ticket.status == TicketStatus.CLOSED:
+            await callback.answer("Bu ariza allaqachon yopilgan", show_alert=True)
+            await callback.message.edit_reply_markup(reply_markup=None)
+            return
 
+    # Disable this message's buttons so a second tap (or a tap on a stale copy of
+    # this notification once the flow is already in progress) can't restart the
+    # close flow and clobber the FSM's in-progress ticket_id/comment/attachment.
+    await callback.message.edit_reply_markup(reply_markup=None)
     await state.update_data(ticket_id=ticket_id)
     await state.set_state(CloseTicket.waiting_inventory_number)
     await callback.message.answer(
@@ -102,9 +110,14 @@ async def handle_close_start(callback: CallbackQuery, state: FSMContext) -> None
 async def handle_close_inventory_number(message: Message, state: FSMContext) -> None:
     number = (message.text or "").strip()
     data = await state.get_data()
+    ticket_id = data.get("ticket_id")
+    if ticket_id is None:
+        await state.clear()
+        await message.answer("Amal muddati tugagan, qaytadan boshlang.")
+        return
 
     async with async_session_factory() as db:
-        ticket = await _get_ticket(db, data["ticket_id"])
+        ticket = await _get_ticket(db, ticket_id)
         if ticket is None:
             await state.clear()
             await message.answer("Ariza topilmadi.")
@@ -115,7 +128,7 @@ async def handle_close_inventory_number(message: Message, state: FSMContext) -> 
         await message.answer(
             "Bu raqam bilan inventar topilmadi. Iltimos, raqamni tekshirib qayta kiriting "
             "yoki ro'yxatdan tanlang:",
-            reply_markup=inventory_browse_keyboard(data["ticket_id"]),
+            reply_markup=inventory_browse_keyboard(ticket_id),
         )
         return
 
@@ -193,7 +206,10 @@ async def handle_noop_callback(callback: CallbackQuery) -> None:
 
 @router.message(StateFilter(CloseTicket.waiting_comment))
 async def handle_close_comment(message: Message, state: FSMContext) -> None:
-    comment = (message.text or "").strip()
+    if message.text is None:
+        await message.answer("Iltimos, yechim izohini matn ko'rinishida yozing (yoki '-' yuboring):")
+        return
+    comment = message.text.strip()
     await state.update_data(resolution_comment=None if comment == "-" else comment)
     await state.set_state(CloseTicket.waiting_attachment)
     await message.answer(
@@ -224,9 +240,25 @@ async def handle_skip_closing_attachment(callback: CallbackQuery, state: FSMCont
     await callback.answer()
 
 
+@router.message(StateFilter(CloseTicket.waiting_attachment))
+async def handle_closing_attachment_wrong_type(message: Message) -> None:
+    # Only F.document is handled above; anything else (photo, plain text, voice,
+    # etc.) used to match no handler at all and leave the technician stuck with
+    # no reply. Re-prompt instead of silently hanging.
+    await message.answer(
+        "Iltimos, hujjat (fayl) yuboring, yoki pastdagi tugma orqali o'tkazib yuboring.",
+        reply_markup=skip_closing_attachment_keyboard(),
+    )
+
+
 async def _do_close(
     bot, state: FSMContext, telegram_id: int, ticket_id: int, is_suspicious: bool, suspicious_comment: str | None
 ) -> Ticket | None:
+    """Returns the closed Ticket (with a `repair_count` attribute set) on success,
+    or None if the close couldn't happen at all — either the caller lacks
+    permission/data, or (`ticket.status == "already_closed"`) the ticket was
+    already closed by the time this ran, e.g. a double-tapped button or a race
+    with another technician."""
     data = await state.get_data()
     closing_attachment = data.get("closing_attachment")
     if closing_attachment is not None:
@@ -242,7 +274,7 @@ async def _do_close(
         ):
             await state.clear()
             return None
-        await close_ticket(
+        closed = await close_ticket(
             db,
             ticket,
             data.get("resolution_comment"),
@@ -251,6 +283,10 @@ async def _do_close(
             data["inventory_item_id"],
             closing_attachment,
         )
+        if not closed:
+            await state.clear()
+            ticket.already_closed = True
+            return ticket
         creator = await db.get(User, ticket.created_by_user_id)
         await notify_ticket_closed(bot, ticket, creator)
         repair_count = await count_repairs(db, data["inventory_item_id"])
@@ -281,6 +317,10 @@ async def handle_suspicious_choice(callback: CallbackQuery, state: FSMContext) -
         await callback.message.answer("Amalni bajarib bo'lmadi: ariza topilmadi yoki huquqingiz yo'q.")
         await callback.answer()
         return
+    if getattr(ticket, "already_closed", False):
+        await callback.message.answer(f"Ariza #{ticket.ticket_number} allaqachon yopilgan.")
+        await callback.answer()
+        return
     await callback.message.answer(
         f"✅ Ariza #{ticket.ticket_number} yopildi. Bu qurilma jami {ticket.repair_count} marta ta'mirlangan."
     )
@@ -290,9 +330,17 @@ async def handle_suspicious_choice(callback: CallbackQuery, state: FSMContext) -
 @router.message(StateFilter(CloseTicket.waiting_suspicious_comment))
 async def handle_suspicious_comment(message: Message, state: FSMContext) -> None:
     data = await state.get_data()
-    ticket = await _do_close(message.bot, state, message.from_user.id, data["ticket_id"], True, message.text)
+    ticket_id = data.get("ticket_id")
+    if ticket_id is None:
+        await state.clear()
+        await message.answer("Amal muddati tugagan, qaytadan boshlang.")
+        return
+    ticket = await _do_close(message.bot, state, message.from_user.id, ticket_id, True, message.text)
     if ticket is None:
         await message.answer("Amalni bajarib bo'lmadi: ariza topilmadi yoki huquqingiz yo'q.")
+        return
+    if getattr(ticket, "already_closed", False):
+        await message.answer(f"Ariza #{ticket.ticket_number} allaqachon yopilgan.")
         return
     await message.answer(
         f"✅ Ariza #{ticket.ticket_number} yopildi. Bu qurilma jami {ticket.repair_count} marta ta'mirlangan."
@@ -314,12 +362,19 @@ async def handle_reassign_start(callback: CallbackQuery, state: FSMContext) -> N
         ):
             await callback.answer("Sizda bu huquq yo'q", show_alert=True)
             return
+        if ticket.status == TicketStatus.CLOSED:
+            await callback.answer("Bu ariza allaqachon yopilgan", show_alert=True)
+            await callback.message.edit_reply_markup(reply_markup=None)
+            return
         candidates = await get_faculty_technicians(db, ticket.faculty_id, exclude_user_id=technician.id)
 
     if not candidates:
         await callback.answer("Boshqa texnik xodim topilmadi", show_alert=True)
         return
 
+    # Disable this message's buttons so a stale copy of the notification can't
+    # be tapped again mid-flow and overwrite the FSM's in-progress ticket_id.
+    await callback.message.edit_reply_markup(reply_markup=None)
     await state.update_data(ticket_id=ticket_id)
     await callback.message.answer(
         "Kimga qayta yo'naltirmoqchisiz?", reply_markup=technician_choice_keyboard(candidates, ticket_id)
@@ -347,11 +402,17 @@ async def handle_reassign_target(callback: CallbackQuery, state: FSMContext) -> 
 async def handle_reassign_reason(message: Message, state: FSMContext) -> None:
     data = await state.get_data()
     reason = (message.text or "").strip()
+    ticket_id = data.get("ticket_id")
+    target_technician_id = data.get("target_technician_id")
+    if ticket_id is None or target_technician_id is None:
+        await state.clear()
+        await message.answer("Amal muddati tugagan, qaytadan boshlang.")
+        return
 
     async with async_session_factory() as db:
         from_technician = await get_user_by_telegram_id(db, message.from_user.id)
-        ticket = await _get_ticket(db, data["ticket_id"])
-        to_technician = await db.get(User, data["target_technician_id"])
+        ticket = await _get_ticket(db, ticket_id)
+        to_technician = await db.get(User, target_technician_id)
         if (
             from_technician is None
             or ticket is None
@@ -363,7 +424,11 @@ async def handle_reassign_reason(message: Message, state: FSMContext) -> None:
             await state.clear()
             await message.answer("Amalni bajarib bo'lmadi: ariza topilmadi yoki huquqingiz yo'q.")
             return
-        await reassign_ticket(db, ticket, from_technician, to_technician, reason)
+        reassigned = await reassign_ticket(db, ticket, from_technician, to_technician, reason)
+        if not reassigned:
+            await state.clear()
+            await message.answer(f"Ariza #{ticket.ticket_number} allaqachon yopilgan, qayta yo'naltirib bo'lmaydi.")
+            return
         await notify_reassignment(message.bot, db, ticket, to_technician, reason)
 
     await state.clear()

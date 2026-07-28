@@ -243,12 +243,19 @@ async def close_ticket(
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Ariza topilmadi")
     if not _can_modify_ticket_faculty(current_user, ticket.faculty_id):
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Bu amal uchun ruxsatingiz yo'q")
+    if ticket.status == TicketStatus.CLOSED:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Ariza allaqachon yopilgan")
 
     inventory_item = await db.get(InventoryItem, payload.inventory_item_id)
     if inventory_item is None or inventory_item.faculty_id != ticket.faculty_id:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="Inventar topilmadi yoki bu fakultetga tegishli emas",
+        )
+    if inventory_item.status == "hisobdan chiqarilgan":
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Bu inventar hisobdan chiqarilgan, arizani unga bog'lab bo'lmaydi",
         )
 
     ticket.status = TicketStatus.CLOSED
@@ -272,6 +279,8 @@ async def reassign_ticket(
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Ariza topilmadi")
     if not _can_modify_ticket_faculty(current_user, ticket.faculty_id):
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Bu amal uchun ruxsatingiz yo'q")
+    if ticket.status == TicketStatus.CLOSED:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Yopilgan arizani qayta yo'naltirib bo'lmaydi")
 
     technician = await db.get(User, payload.technician_id)
     if (

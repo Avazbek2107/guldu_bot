@@ -137,13 +137,26 @@ async def close_ticket(
     suspicious_comment: str | None,
     inventory_item_id: int,
     closing_attachment: tuple[str, AttachmentType] | None = None,
-) -> None:
-    ticket.status = TicketStatus.CLOSED
-    ticket.closed_at = datetime.now(timezone.utc)
-    ticket.resolution_comment = resolution_comment
-    ticket.is_suspicious = is_suspicious
-    ticket.suspicious_comment = suspicious_comment
-    ticket.inventory_item_id = inventory_item_id
+) -> bool:
+    """Atomically close a not-yet-closed ticket. Returns False (no-op) if it was
+    already closed — e.g. a double-tapped button or two technicians racing to
+    close the same ticket — so the caller can avoid a duplicate attachment row
+    and a misleading "success" message."""
+    result = await db.execute(
+        update(Ticket)
+        .where(Ticket.id == ticket.id, Ticket.status != TicketStatus.CLOSED)
+        .values(
+            status=TicketStatus.CLOSED,
+            closed_at=datetime.now(timezone.utc),
+            resolution_comment=resolution_comment,
+            is_suspicious=is_suspicious,
+            suspicious_comment=suspicious_comment,
+            inventory_item_id=inventory_item_id,
+        )
+    )
+    if result.rowcount == 0:
+        await db.rollback()
+        return False
     if is_suspicious:
         creator = await db.get(User, ticket.created_by_user_id)
         creator.is_suspicious = True
@@ -151,11 +164,15 @@ async def close_ticket(
         file_path, file_type = closing_attachment
         db.add(TicketAttachment(ticket_id=ticket.id, file_path=file_path, file_type=file_type))
     await db.commit()
+    await db.refresh(ticket)
+    return True
 
 
 async def reassign_ticket(
     db: AsyncSession, ticket: Ticket, from_technician: User, to_technician: User, reason: str
-) -> None:
+) -> bool:
+    if ticket.status == TicketStatus.CLOSED:
+        return False
     db.add(
         TicketReassignment(
             ticket_id=ticket.id,
@@ -166,6 +183,7 @@ async def reassign_ticket(
     )
     ticket.assigned_technician_id = to_technician.id
     await db.commit()
+    return True
 
 
 CATEGORY_LABELS_UZ = {

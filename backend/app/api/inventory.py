@@ -1,5 +1,6 @@
 from fastapi import APIRouter, Depends, File, HTTPException, Response, UploadFile, status
 from sqlalchemy import func, select
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import aliased
 
@@ -44,6 +45,25 @@ async def _lookup_main_technician_id(db: AsyncSession, faculty_id: int) -> int |
         )
     )
     return result.scalar_one_or_none()
+
+
+async def _validate_assigned_technician(db: AsyncSession, technician_id: int | None, faculty_id: int) -> None:
+    if technician_id is None:
+        return
+    technician = await db.get(User, technician_id)
+    if technician is None or technician.role not in TECHNICIAN_ROLES:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Texnik xodim topilmadi")
+    result = await db.execute(
+        select(TechnicianFacultyAssignment.id).where(
+            TechnicianFacultyAssignment.user_id == technician_id,
+            TechnicianFacultyAssignment.faculty_id == faculty_id,
+        )
+    )
+    if result.scalar_one_or_none() is None:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Texnik xodim ushbu fakultet/bo'limga biriktirilmagan",
+        )
 
 
 def _to_out(
@@ -270,10 +290,16 @@ async def create_inventory_item(
     data = payload.model_dump()
     if data.get("assigned_technician_id") is None:
         data["assigned_technician_id"] = await _lookup_main_technician_id(db, payload.faculty_id)
+    else:
+        await _validate_assigned_technician(db, data["assigned_technician_id"], payload.faculty_id)
 
     item = InventoryItem(**data)
     db.add(item)
-    await db.commit()
+    try:
+        await db.commit()
+    except IntegrityError as exc:
+        await db.rollback()
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Ma'lumotlar noto'g'ri") from exc
     await db.refresh(item)
     return await _serialize_one(db, item, faculty.name)
 
@@ -298,9 +324,21 @@ async def update_inventory_item(
         if target_faculty is None:
             raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Fakultet/bo'lim topilmadi")
 
+    if "assigned_technician_id" in data:
+        await _validate_assigned_technician(db, data["assigned_technician_id"], target_faculty_id)
+    elif target_faculty_id != item.faculty_id and item.assigned_technician_id is not None:
+        # Faculty is changing but no new technician was specified — clear the
+        # now-stale assignment rather than silently leaving a technician from
+        # the OLD faculty attached to an item that no longer belongs to them.
+        data["assigned_technician_id"] = None
+
     for field, value in data.items():
         setattr(item, field, value)
-    await db.commit()
+    try:
+        await db.commit()
+    except IntegrityError as exc:
+        await db.rollback()
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Ma'lumotlar noto'g'ri") from exc
     await db.refresh(item)
 
     faculty = await db.get(Faculty, item.faculty_id)

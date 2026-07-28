@@ -73,8 +73,10 @@ export function InventoryPage() {
   const [exportLoading, setExportLoading] = useState(false);
   const [importLoading, setImportLoading] = useState(false);
   const fileInputRef = useRef<HTMLInputElement | null>(null);
+  const requestIdRef = useRef(0);
 
   async function loadData() {
+    const requestId = ++requestIdRef.current;
     setLoading(true);
     try {
       const [itemList, facultyList, mainTechs, backupTechs] = await Promise.all([
@@ -83,11 +85,15 @@ export function InventoryPage() {
         listUsers({ role: "technician_main" }),
         listUsers({ role: "technician_backup" }),
       ]);
-      setItems(itemList);
-      setFaculties(facultyList);
-      setTechnicians([...mainTechs, ...backupTechs]);
+      if (requestId === requestIdRef.current) {
+        setItems(itemList);
+        setFaculties(facultyList);
+        setTechnicians([...mainTechs, ...backupTechs]);
+      }
     } finally {
-      setLoading(false);
+      if (requestId === requestIdRef.current) {
+        setLoading(false);
+      }
     }
   }
 
@@ -338,7 +344,10 @@ export function InventoryPage() {
       >
         <Form form={createForm} layout="vertical" onFinish={handleCreate} initialValues={{ status: "ishchi" }}>
           <Form.Item name="faculty_id" label="Fakultet/Bo'lim" rules={[{ required: true }]}>
-            <Select options={faculties.map((f) => ({ value: f.id, label: orgUnitLabel(f) }))} />
+            <Select
+              options={faculties.map((f) => ({ value: f.id, label: orgUnitLabel(f) }))}
+              onChange={() => createForm.setFieldValue("assigned_technician_id", undefined)}
+            />
           </Form.Item>
           <Form.Item name="sub_unit" label="Kafedra/Bo'lim">
             <Input />
@@ -367,7 +376,11 @@ export function InventoryPage() {
           <Form.Item name="responsible_person" label="Mas'ul shaxs">
             <Input />
           </Form.Item>
-          <Form.Item name="assigned_technician_id" label="Texnik xodim">
+          <Form.Item
+            name="assigned_technician_id"
+            label="Texnik xodim"
+            extra="Fakultet/bo'lim o'zgartirilsa, tanlangan texnik xodim tozalanadi"
+          >
             <Select
               allowClear
               showSearch
@@ -390,7 +403,10 @@ export function InventoryPage() {
       >
         <Form form={editForm} layout="vertical" onFinish={handleEditSave}>
           <Form.Item name="faculty_id" label="Fakultet/Bo'lim" rules={[{ required: true }]}>
-            <Select options={faculties.map((f) => ({ value: f.id, label: orgUnitLabel(f) }))} />
+            <Select
+              options={faculties.map((f) => ({ value: f.id, label: orgUnitLabel(f) }))}
+              onChange={() => editForm.setFieldValue("assigned_technician_id", undefined)}
+            />
           </Form.Item>
           <Form.Item name="sub_unit" label="Kafedra/Bo'lim">
             <Input />
@@ -419,7 +435,11 @@ export function InventoryPage() {
           <Form.Item name="responsible_person" label="Mas'ul shaxs">
             <Input />
           </Form.Item>
-          <Form.Item name="assigned_technician_id" label="Texnik xodim">
+          <Form.Item
+            name="assigned_technician_id"
+            label="Texnik xodim"
+            extra="Fakultet/bo'lim o'zgartirilsa, tanlangan texnik xodim tozalanadi"
+          >
             <Select
               allowClear
               showSearch

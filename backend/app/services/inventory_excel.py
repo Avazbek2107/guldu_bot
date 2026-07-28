@@ -7,6 +7,7 @@ from openpyxl.styles import Font
 from openpyxl.utils import get_column_letter
 
 from app.schemas.inventory import InventoryItemOut
+from app.services.excel_safety import safe_row
 
 HEADERS = [
     "№", "FAKULTET", "FAKULTET, KAFEDRA, BO'LIM", "XONA", "INVENTAR RAQAMI",
@@ -27,19 +28,21 @@ def generate_inventory_xlsx(items: Sequence[InventoryItemOut]) -> bytes:
 
     for index, item in enumerate(items, start=1):
         ws.append(
-            [
-                index,
-                item.faculty_name,
-                item.sub_unit or "",
-                item.room or "",
-                item.inventory_number or "",
-                item.uzasbo or "",
-                item.inventory_type or "",
-                item.model or "",
-                item.status or "",
-                item.internet_connection or "",
-                item.responsible_person or "",
-            ]
+            safe_row(
+                [
+                    index,
+                    item.faculty_name,
+                    item.sub_unit or "",
+                    item.room or "",
+                    item.inventory_number or "",
+                    item.uzasbo or "",
+                    item.inventory_type or "",
+                    item.model or "",
+                    item.status or "",
+                    item.internet_connection or "",
+                    item.responsible_person or "",
+                ]
+            )
         )
 
     for col_index, width in enumerate(COLUMN_WIDTHS, start=1):

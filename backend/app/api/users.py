@@ -8,6 +8,7 @@ from app.api.deps import get_current_user, has_permission, technician_faculty_id
 from app.core.database import get_db
 from app.core.security import hash_password
 from app.models.enums import TechnicianFacultyRole, UserRole
+from app.models.faculty import Faculty
 from app.models.technician_faculty_assignment import TechnicianFacultyAssignment
 from app.models.user import User
 from app.schemas.user import (
@@ -116,10 +117,18 @@ async def list_users(
             TechnicianFacultyAssignment.faculty_id.in_(own_faculty_ids)
         )
         query = query.where(User.id.in_(shared_technicians), User.role.in_(TECHNICIAN_ROLES))
-    elif current_user.role == UserRole.ADMIN and parsed_roles and all(r in TECHNICIAN_ROLES for r in parsed_roles):
+    elif (
+        current_user.role == UserRole.ADMIN
+        and parsed_roles
+        and all(r in TECHNICIAN_ROLES for r in parsed_roles)
+        and (has_permission(current_user, "tickets") or has_permission(current_user, "inventory"))
+    ):
         # Admins without explicit "users" access can still fetch the technician
         # roster as supporting data for pages they *are* permitted to use
-        # (e.g. reassigning a ticket, picking a technician for inventory).
+        # (e.g. reassigning a ticket, picking a technician for inventory) — but
+        # only if they actually have access to one of those pages, otherwise
+        # this would let an Admin with ZERO permissions enumerate every
+        # technician's name/phone/faculty assignments university-wide.
         _apply_role_and_faculty_filters()
     else:
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Bu amal uchun ruxsatingiz yo'q")
@@ -178,11 +187,14 @@ async def update_user(
     ):
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Bu amal uchun ruxsatingiz yo'q")
 
-    if payload.faculty_id is not None and user.role in TECHNICIAN_ROLES:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Texnik xodim uchun faculty_id emas, faculty_assignments ishlatiladi",
-        )
+    if payload.faculty_id is not None:
+        if user.role in TECHNICIAN_ROLES:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Texnik xodim uchun faculty_id emas, faculty_assignments ishlatiladi",
+            )
+        if await db.get(Faculty, payload.faculty_id) is None:
+            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Fakultet/bo'lim topilmadi")
 
     data = payload.model_dump(exclude_unset=True, exclude={"password", "faculty_assignments", "permissions"})
     for field, value in data.items():

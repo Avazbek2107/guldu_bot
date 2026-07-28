@@ -7,6 +7,7 @@ from openpyxl.styles import Font
 from openpyxl.utils import get_column_letter
 
 from app.schemas.faculty import FacultyOut
+from app.services.excel_safety import safe_row
 
 HEADERS = ["№", "NOMI"]
 COLUMN_WIDTHS = [6, 40]
@@ -22,7 +23,7 @@ def generate_faculty_xlsx(faculties: Sequence[FacultyOut]) -> bytes:
         cell.font = Font(bold=True)
 
     for index, faculty in enumerate(faculties, start=1):
-        ws.append([index, faculty.name])
+        ws.append(safe_row([index, faculty.name]))
 
     for col_index, width in enumerate(COLUMN_WIDTHS, start=1):
         ws.column_dimensions[get_column_letter(col_index)].width = width

@@ -6,6 +6,7 @@ from openpyxl.styles import Font
 from openpyxl.utils import get_column_letter
 
 from app.schemas.ticket import TicketOut
+from app.services.excel_safety import safe_row
 
 CATEGORY_LABELS_UZ = {
     "computer": "Kompyuter",
@@ -37,21 +38,23 @@ def generate_tickets_xlsx(tickets: Sequence[TicketOut]) -> bytes:
 
     for t in tickets:
         ws.append(
-            [
-                t.ticket_number,
-                t.creator_full_name,
-                t.creator_phone,
-                t.faculty_name,
-                CATEGORY_LABELS_UZ.get(t.category.value, t.category.value),
-                PRIORITY_LABELS_UZ.get(t.priority.value, t.priority.value),
-                t.description,
-                STATUS_LABELS_UZ.get(t.status.value, t.status.value),
-                t.technician_full_name or "-",
-                t.created_at.strftime("%Y-%m-%d %H:%M") if t.created_at else "-",
-                t.closed_at.strftime("%Y-%m-%d %H:%M") if t.closed_at else "-",
-                t.resolution_comment or "-",
-                t.inventory_number or "-",
-            ]
+            safe_row(
+                [
+                    t.ticket_number,
+                    t.creator_full_name,
+                    t.creator_phone,
+                    t.faculty_name,
+                    CATEGORY_LABELS_UZ.get(t.category.value, t.category.value),
+                    PRIORITY_LABELS_UZ.get(t.priority.value, t.priority.value),
+                    t.description,
+                    STATUS_LABELS_UZ.get(t.status.value, t.status.value),
+                    t.technician_full_name or "-",
+                    t.created_at.strftime("%Y-%m-%d %H:%M") if t.created_at else "-",
+                    t.closed_at.strftime("%Y-%m-%d %H:%M") if t.closed_at else "-",
+                    t.resolution_comment or "-",
+                    t.inventory_number or "-",
+                ]
+            )
         )
 
     for index, width in enumerate(COLUMN_WIDTHS, start=1):

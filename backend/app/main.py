@@ -3,25 +3,22 @@ import os
 from fastapi import Depends, FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
-from fastapi.staticfiles import StaticFiles
 from jwt import PyJWTError
 from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.api import auth, faculties, inventory, stats, tickets, users
+from app.api import auth, faculties, inventory, stats, storage, tickets, users
 from app.core.config import settings
 from app.core.database import get_db
 from app.core.security import decode_access_token
 
 app = FastAPI(title="Technician Support Bot API")
 
-_avatars_dir = os.path.join(settings.storage_dir, "avatars")
-os.makedirs(_avatars_dir, exist_ok=True)
-app.mount("/storage/avatars", StaticFiles(directory=_avatars_dir), name="avatars")
-
-_ticket_attachments_dir = os.path.join(settings.storage_dir, "ticket_attachments")
-os.makedirs(_ticket_attachments_dir, exist_ok=True)
-app.mount("/storage/ticket_attachments", StaticFiles(directory=_ticket_attachments_dir), name="ticket_attachments")
+# Avatars and ticket-closing attachments are served through app/api/storage.py
+# (requires an authenticated session) rather than an open StaticFiles mount,
+# so a filename can't just be guessed/enumerated by an unauthenticated client.
+os.makedirs(os.path.join(settings.storage_dir, "avatars"), exist_ok=True)
+os.makedirs(os.path.join(settings.storage_dir, "ticket_attachments"), exist_ok=True)
 
 app.add_middleware(
     CORSMiddleware,
@@ -64,6 +61,7 @@ app.include_router(users.router)
 app.include_router(tickets.router)
 app.include_router(stats.router)
 app.include_router(inventory.router)
+app.include_router(storage.router)
 
 
 @app.get("/health")
