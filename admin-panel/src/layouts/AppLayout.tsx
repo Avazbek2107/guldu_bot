@@ -148,10 +148,9 @@ export function AppLayout() {
 
   const menuItems = [
     hasPermission(user, "dashboard") ? { key: "/dashboard", icon: <DashboardOutlined />, label: "Dashboard" } : null,
+    hasPermission(user, "users") ? { key: "/users", icon: <TeamOutlined />, label: "Xodimlar" } : null,
     canSeeTickets ? { key: "/tickets", icon: <UnorderedListOutlined />, label: "Arizalar" } : null,
     canSeeInventory ? { key: "/inventory", icon: <DatabaseOutlined />, label: "Inventar" } : null,
-    hasPermission(user, "users") ? { key: "/users", icon: <TeamOutlined />, label: "Xodimlar" } : null,
-    hasPermission(user, "users") ? { key: "/admins", icon: <CrownOutlined />, label: "Boshqaruv" } : null,
     hasPermission(user, "end_users")
       ? { key: "/end-users", icon: <UserOutlined />, label: "Foydalanuvchilar" }
       : null,
@@ -159,6 +158,7 @@ export function AppLayout() {
     hasPermission(user, "departments")
       ? { key: "/departments", icon: <ClusterOutlined />, label: "Bo'limlar" }
       : null,
+    hasPermission(user, "users") ? { key: "/admins", icon: <CrownOutlined />, label: "Boshqaruv" } : null,
   ].filter((item): item is NonNullable<typeof item> => item !== null);
 
   const menu = (
