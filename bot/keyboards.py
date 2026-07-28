@@ -94,6 +94,12 @@ def skip_attachment_keyboard() -> InlineKeyboardMarkup:
     return builder.as_markup()
 
 
+def skip_closing_attachment_keyboard() -> InlineKeyboardMarkup:
+    builder = InlineKeyboardBuilder()
+    builder.button(text="➡️ O'tkazib yuborish", callback_data="closing_attachment:skip")
+    return builder.as_markup()
+
+
 def confirm_ticket_keyboard() -> InlineKeyboardMarkup:
     builder = InlineKeyboardBuilder()
     builder.button(text="✅ Yuborish", callback_data="ticket:submit")

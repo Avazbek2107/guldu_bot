@@ -125,6 +125,7 @@ export interface TicketOut {
   closed_at: string | null;
   inventory_item_id: number | null;
   inventory_number: string | null;
+  closing_attachment_url: string | null;
 }
 
 export interface InventoryItemOut {

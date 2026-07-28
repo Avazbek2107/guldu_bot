@@ -12,8 +12,8 @@ import {
   Tooltip,
   message,
 } from "antd";
-import { FileExcelOutlined, FilePdfOutlined } from "@ant-design/icons";
-import { downloadTicketPdf } from "../api/client";
+import { FileExcelOutlined, FilePdfOutlined, PaperClipOutlined } from "@ant-design/icons";
+import { downloadTicketPdf, resolveAssetUrl } from "../api/client";
 import { closeTicket, exportTickets, listTickets, reassignTicket, type TicketFilters } from "../api/tickets";
 import { listFaculties } from "../api/faculties";
 import { listInventory } from "../api/inventory";
@@ -238,6 +238,24 @@ export function TicketsPage() {
             render: (value: TicketStatus) => <Tag color={STATUS_COLORS[value]}>{STATUS_LABELS_UZ[value]}</Tag>,
           },
           { title: "Texnik xodim", dataIndex: "technician_full_name", render: (v: string | null) => v ?? "-" },
+          {
+            title: "Bildirishnoma",
+            key: "closing_attachment",
+            render: (_: unknown, record: TicketOut) =>
+              record.closing_attachment_url ? (
+                <Tooltip title="Bildirishnomani yuklab olish">
+                  <a
+                    href={resolveAssetUrl(record.closing_attachment_url)}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                  >
+                    <Button size="small" icon={<PaperClipOutlined />} />
+                  </a>
+                </Tooltip>
+              ) : (
+                "-"
+              ),
+          },
           {
             title: "Sana",
             dataIndex: "created_at",

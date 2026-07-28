@@ -43,3 +43,4 @@ class TicketStatus(str, enum.Enum):
 class AttachmentType(str, enum.Enum):
     PHOTO = "photo"
     VIDEO = "video"
+    DOCUMENT = "document"

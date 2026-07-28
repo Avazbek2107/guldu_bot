@@ -19,6 +19,10 @@ _avatars_dir = os.path.join(settings.storage_dir, "avatars")
 os.makedirs(_avatars_dir, exist_ok=True)
 app.mount("/storage/avatars", StaticFiles(directory=_avatars_dir), name="avatars")
 
+_ticket_attachments_dir = os.path.join(settings.storage_dir, "ticket_attachments")
+os.makedirs(_ticket_attachments_dir, exist_ok=True)
+app.mount("/storage/ticket_attachments", StaticFiles(directory=_ticket_attachments_dir), name="ticket_attachments")
+
 app.add_middleware(
     CORSMiddleware,
     allow_origins=settings.cors_origins_list,

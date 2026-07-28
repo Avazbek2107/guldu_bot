@@ -23,6 +23,7 @@ class NewTicket(StatesGroup):
 class CloseTicket(StatesGroup):
     waiting_inventory_number = State()
     waiting_comment = State()
+    waiting_attachment = State()
     waiting_suspicious_comment = State()
 
 

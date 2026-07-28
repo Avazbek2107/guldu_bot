@@ -1,4 +1,5 @@
 import asyncio
+import os
 
 from aiogram import F, Router
 from aiogram.filters import StateFilter
@@ -7,7 +8,7 @@ from aiogram.types import BufferedInputFile, CallbackQuery, Message
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.database import async_session_factory
-from app.models.enums import TicketStatus, UserRole
+from app.models.enums import AttachmentType, TicketStatus, UserRole
 from app.models.faculty import Faculty
 from app.models.ticket import Ticket
 from app.models.user import User
@@ -17,10 +18,12 @@ from bot.keyboards import (
     INVENTORY_PAGE_SIZE,
     inventory_browse_keyboard,
     inventory_picker_keyboard,
+    skip_closing_attachment_keyboard,
     suspicious_keyboard,
     technician_choice_keyboard,
     ticket_actions_keyboard,
 )
+from bot.services.files import save_closing_attachment
 from bot.services.inventory import count_repairs, find_inventory_item, list_inventory_page
 from bot.services.tickets import (
     accept_ticket,
@@ -192,14 +195,42 @@ async def handle_noop_callback(callback: CallbackQuery) -> None:
 async def handle_close_comment(message: Message, state: FSMContext) -> None:
     comment = (message.text or "").strip()
     await state.update_data(resolution_comment=None if comment == "-" else comment)
+    await state.set_state(CloseTicket.waiting_attachment)
+    await message.answer(
+        "Bildirishnoma (hujjat) biriktirishingiz mumkin (ixtiyoriy):",
+        reply_markup=skip_closing_attachment_keyboard(),
+    )
+
+
+async def _ask_suspicious(message: Message, ticket_id: int) -> None:
+    await message.answer("Bu chaqiruv shubhalimi?", reply_markup=suspicious_keyboard(ticket_id))
+
+
+@router.message(StateFilter(CloseTicket.waiting_attachment), F.document)
+async def handle_closing_attachment(message: Message, state: FSMContext) -> None:
+    document = message.document
+    extension = os.path.splitext(document.file_name or "")[1]
+    path = await save_closing_attachment(message, document.file_id, extension)
+    await state.update_data(closing_attachment=(path, AttachmentType.DOCUMENT.value))
     data = await state.get_data()
-    await message.answer("Bu chaqiruv shubhalimi?", reply_markup=suspicious_keyboard(data["ticket_id"]))
+    await _ask_suspicious(message, data["ticket_id"])
+
+
+@router.callback_query(StateFilter(CloseTicket.waiting_attachment), F.data == "closing_attachment:skip")
+async def handle_skip_closing_attachment(callback: CallbackQuery, state: FSMContext) -> None:
+    await callback.message.edit_reply_markup(reply_markup=None)
+    data = await state.get_data()
+    await _ask_suspicious(callback.message, data["ticket_id"])
+    await callback.answer()
 
 
 async def _do_close(
     bot, state: FSMContext, telegram_id: int, ticket_id: int, is_suspicious: bool, suspicious_comment: str | None
 ) -> Ticket | None:
     data = await state.get_data()
+    closing_attachment = data.get("closing_attachment")
+    if closing_attachment is not None:
+        closing_attachment = (closing_attachment[0], AttachmentType(closing_attachment[1]))
     async with async_session_factory() as db:
         technician = await get_user_by_telegram_id(db, telegram_id)
         ticket = await _get_ticket(db, ticket_id)
@@ -212,7 +243,13 @@ async def _do_close(
             await state.clear()
             return None
         await close_ticket(
-            db, ticket, data.get("resolution_comment"), is_suspicious, suspicious_comment, data["inventory_item_id"]
+            db,
+            ticket,
+            data.get("resolution_comment"),
+            is_suspicious,
+            suspicious_comment,
+            data["inventory_item_id"],
+            closing_attachment,
         )
         creator = await db.get(User, ticket.created_by_user_id)
         await notify_ticket_closed(bot, ticket, creator)

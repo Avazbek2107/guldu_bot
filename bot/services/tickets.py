@@ -136,6 +136,7 @@ async def close_ticket(
     is_suspicious: bool,
     suspicious_comment: str | None,
     inventory_item_id: int,
+    closing_attachment: tuple[str, AttachmentType] | None = None,
 ) -> None:
     ticket.status = TicketStatus.CLOSED
     ticket.closed_at = datetime.now(timezone.utc)
@@ -146,6 +147,9 @@ async def close_ticket(
     if is_suspicious:
         creator = await db.get(User, ticket.created_by_user_id)
         creator.is_suspicious = True
+    if closing_attachment is not None:
+        file_path, file_type = closing_attachment
+        db.add(TicketAttachment(ticket_id=ticket.id, file_path=file_path, file_type=file_type))
     await db.commit()
 
 

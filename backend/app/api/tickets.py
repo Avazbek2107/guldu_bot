@@ -8,11 +8,11 @@ from sqlalchemy.orm import aliased
 
 from app.api.deps import get_current_user, has_permission, technician_faculty_ids
 from app.core.database import get_db
-from app.models.enums import TicketCategory, TicketPriority, TicketStatus, UserRole
+from app.models.enums import AttachmentType, TicketCategory, TicketPriority, TicketStatus, UserRole
 from app.models.faculty import Faculty
 from app.models.inventory_item import InventoryItem
 from app.models.technician_faculty_assignment import TechnicianFacultyAssignment
-from app.models.ticket import Ticket, TicketReassignment
+from app.models.ticket import Ticket, TicketAttachment, TicketReassignment
 from app.models.user import User
 from app.schemas.ticket import TicketCloseRequest, TicketOut, TicketReassignRequest
 from app.services.excel_generator import generate_tickets_xlsx
@@ -21,6 +21,14 @@ from app.services.pdf_generator import generate_ticket_pdf, generate_tickets_lis
 router = APIRouter(prefix="/tickets", tags=["tickets"])
 
 TECHNICIAN_ROLES = (UserRole.TECHNICIAN_MAIN, UserRole.TECHNICIAN_BACKUP)
+
+_closing_attachment_subquery = (
+    select(TicketAttachment.file_path)
+    .where(TicketAttachment.ticket_id == Ticket.id, TicketAttachment.file_type == AttachmentType.DOCUMENT)
+    .order_by(TicketAttachment.uploaded_at.desc())
+    .limit(1)
+    .scalar_subquery()
+)
 
 
 def _can_access_ticket_faculty(current_user: User, faculty_id: int) -> bool:
@@ -50,7 +58,15 @@ async def _is_technician_assigned(db: AsyncSession, user_id: int, faculty_id: in
 
 
 def _row_to_ticket_out(row) -> TicketOut:
-    ticket, faculty_name, creator_full_name, creator_phone, technician_full_name, inventory_number = row
+    (
+        ticket,
+        faculty_name,
+        creator_full_name,
+        creator_phone,
+        technician_full_name,
+        inventory_number,
+        closing_attachment_path,
+    ) = row
     return TicketOut(
         id=ticket.id,
         ticket_number=ticket.ticket_number,
@@ -71,6 +87,7 @@ def _row_to_ticket_out(row) -> TicketOut:
         closed_at=ticket.closed_at,
         inventory_item_id=ticket.inventory_item_id,
         inventory_number=inventory_number,
+        closing_attachment_url=f"/storage/{closing_attachment_path}" if closing_attachment_path else None,
     )
 
 
@@ -97,6 +114,7 @@ async def list_tickets(
             creator_alias.phone,
             technician_alias.full_name,
             InventoryItem.inventory_number,
+            _closing_attachment_subquery,
         )
         .join(Faculty, Ticket.faculty_id == Faculty.id)
         .join(creator_alias, Ticket.created_by_user_id == creator_alias.id)
@@ -193,6 +211,7 @@ async def get_ticket(
             creator_alias.phone,
             technician_alias.full_name,
             InventoryItem.inventory_number,
+            _closing_attachment_subquery,
         )
         .join(Faculty, Ticket.faculty_id == Faculty.id)
         .join(creator_alias, Ticket.created_by_user_id == creator_alias.id)

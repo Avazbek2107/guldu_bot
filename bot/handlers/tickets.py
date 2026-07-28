@@ -1,13 +1,9 @@
-import os
-import uuid
-
 from aiogram import F, Router
 from aiogram.filters import Command, StateFilter
 from aiogram.fsm.context import FSMContext
 from aiogram.types import CallbackQuery, Message
 from sqlalchemy import select
 
-from app.core.config import settings as backend_settings
 from app.core.database import async_session_factory
 from app.models.enums import AttachmentType, TicketCategory, TicketPriority, UserRole
 from app.models.ticket import Ticket
@@ -20,6 +16,7 @@ from bot.keyboards import (
     priority_keyboard,
     skip_attachment_keyboard,
 )
+from bot.services.files import save_telegram_file
 from bot.services.tickets import (
     CATEGORY_LABELS_UZ,
     PRIORITY_LABELS_UZ,
@@ -101,14 +98,6 @@ async def handle_priority(callback: CallbackQuery, state: FSMContext) -> None:
     await callback.answer()
 
 
-async def _save_telegram_file(message: Message, file_id: str, extension: str) -> str:
-    os.makedirs(backend_settings.storage_dir, exist_ok=True)
-    filename = f"{uuid.uuid4().hex}{extension}"
-    destination = os.path.join(backend_settings.storage_dir, filename)
-    await message.bot.download(file_id, destination=destination)
-    return destination
-
-
 async def _show_confirmation(message: Message, state: FSMContext) -> None:
     data = await state.get_data()
     await state.set_state(NewTicket.confirm)
@@ -125,7 +114,7 @@ async def _show_confirmation(message: Message, state: FSMContext) -> None:
 @router.message(StateFilter(NewTicket.waiting_attachment), F.photo)
 async def handle_photo_attachment(message: Message, state: FSMContext) -> None:
     file_id = message.photo[-1].file_id
-    path = await _save_telegram_file(message, file_id, ".jpg")
+    path = await save_telegram_file(message, file_id, ".jpg")
     data = await state.get_data()
     attachments = data.get("attachments", [])
     attachments.append((path, AttachmentType.PHOTO.value))
@@ -136,7 +125,7 @@ async def handle_photo_attachment(message: Message, state: FSMContext) -> None:
 @router.message(StateFilter(NewTicket.waiting_attachment), F.video)
 async def handle_video_attachment(message: Message, state: FSMContext) -> None:
     file_id = message.video.file_id
-    path = await _save_telegram_file(message, file_id, ".mp4")
+    path = await save_telegram_file(message, file_id, ".mp4")
     data = await state.get_data()
     attachments = data.get("attachments", [])
     attachments.append((path, AttachmentType.VIDEO.value))

@@ -27,6 +27,7 @@ class TicketOut(BaseModel):
     closed_at: datetime | None
     inventory_item_id: int | None
     inventory_number: str | None
+    closing_attachment_url: str | None = None
 
 
 class TicketCloseRequest(BaseModel):
