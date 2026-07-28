@@ -32,7 +32,7 @@ function App() {
 
         <Route element={<ProtectedRoute />}>
           <Route element={<AppLayout />}>
-            <Route index element={<Navigate to="/tickets" replace />} />
+            <Route index element={<Navigate to="/dashboard" replace />} />
 
             <Route
               element={
