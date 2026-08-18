@@ -100,7 +100,9 @@ async def handle_registration_org_unit_type(callback: CallbackQuery, state: FSMC
 
     async with async_session_factory() as db:
         result = await db.execute(
-            select(Faculty).where(Faculty.unit_type == OrgUnitType(unit_type)).order_by(Faculty.name)
+            select(Faculty)
+            .where(Faculty.unit_type == OrgUnitType(unit_type), Faculty.parent_id.is_(None))
+            .order_by(Faculty.name)
         )
         faculties = list(result.scalars().all())
 
@@ -172,7 +174,9 @@ async def handle_profile_org_unit_type(callback: CallbackQuery, state: FSMContex
 
     async with async_session_factory() as db:
         result = await db.execute(
-            select(Faculty).where(Faculty.unit_type == OrgUnitType(unit_type)).order_by(Faculty.name)
+            select(Faculty)
+            .where(Faculty.unit_type == OrgUnitType(unit_type), Faculty.parent_id.is_(None))
+            .order_by(Faculty.name)
         )
         faculties = list(result.scalars().all())
 

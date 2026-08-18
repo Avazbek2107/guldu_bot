@@ -155,7 +155,6 @@ async def close_ticket(
         )
     )
     if result.rowcount == 0:
-        await db.rollback()
         return False
     if is_suspicious:
         creator = await db.get(User, ticket.created_by_user_id)
