@@ -241,6 +241,7 @@ export interface DashboardStats {
   in_progress_tickets: number;
   closed_tickets: number;
   faculty_stats: FacultyStat[];
+  department_stats: FacultyStat[];
   technician_stats: TechnicianStat[];
   reporter_stats: ReporterStat[];
   category_stats: CategoryStat[];

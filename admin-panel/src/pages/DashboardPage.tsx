@@ -395,7 +395,7 @@ export function DashboardPage() {
       </Row>
 
       <Row gutter={[16, 16]} style={{ marginTop: 16 }}>
-        <Col xs={24} lg={12}>
+        <Col xs={24} lg={8}>
           <Card title="Fakultetlar kesimida statistika" style={CARD_STYLE}>
             <Table
               size="small"
@@ -425,7 +425,37 @@ export function DashboardPage() {
             />
           </Card>
         </Col>
-        <Col xs={24} lg={12}>
+        <Col xs={24} lg={8}>
+          <Card title="Bo'limlar kesimida statistika" style={CARD_STYLE}>
+            <Table
+              size="small"
+              rowKey="faculty_id"
+              pagination={false}
+              scroll={{ x: "max-content" }}
+              dataSource={stats.department_stats}
+              columns={[
+                { title: "Bo'lim", dataIndex: "faculty_name" },
+                { title: "Jami", dataIndex: "total" },
+                {
+                  title: "Ochiq",
+                  dataIndex: "open",
+                  render: (v: number) => <CountTag value={v} color={RED} />,
+                },
+                {
+                  title: "Jarayonda",
+                  dataIndex: "in_progress",
+                  render: (v: number) => <CountTag value={v} color={YELLOW} />,
+                },
+                {
+                  title: "Yopilgan",
+                  dataIndex: "closed",
+                  render: (v: number) => <CountTag value={v} color={GREEN} />,
+                },
+              ]}
+            />
+          </Card>
+        </Col>
+        <Col xs={24} lg={8}>
           <Card title="Xodimlar ish samaradorligi" style={CARD_STYLE}>
             <Table
               size="small"

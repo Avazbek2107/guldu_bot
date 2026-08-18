@@ -65,6 +65,7 @@ class DashboardStats(BaseModel):
     in_progress_tickets: int
     closed_tickets: int
     faculty_stats: list[FacultyStat]
+    department_stats: list[FacultyStat]
     technician_stats: list[TechnicianStat]
     reporter_stats: list[ReporterStat]
     category_stats: list[CategoryStat]

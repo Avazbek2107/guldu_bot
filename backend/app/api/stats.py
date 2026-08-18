@@ -7,7 +7,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.api.deps import require_permission
 from app.core.database import get_db
-from app.models.enums import TicketStatus, UserRole
+from app.models.enums import OrgUnitType, TicketStatus, UserRole
 from app.models.faculty import Faculty
 from app.models.inventory_item import InventoryItem
 from app.models.ticket import Ticket
@@ -46,7 +46,18 @@ async def get_dashboard_stats(db: AsyncSession = Depends(get_db)):
     in_progress_tickets = status_counts.get(TicketStatus.IN_PROGRESS, 0)
     closed_tickets = status_counts.get(TicketStatus.CLOSED, 0)
 
-    faculties = (await db.execute(select(Faculty))).scalars().all()
+    # Kafedras (parent_id set) are academic sub-units nested under a faculty for
+    # display purposes only — tickets/inventory are never filed directly against
+    # one, so they're excluded here entirely rather than showing up as
+    # zero-row noise. Faculty-type and standalone Department-type ("bo'lim")
+    # units are kept in separate lists so they render as separate dashboard
+    # tables instead of one merged one.
+    org_units = (
+        (await db.execute(select(Faculty).where(Faculty.parent_id.is_(None)))).scalars().all()
+    )
+    faculty_units = [f for f in org_units if f.unit_type == OrgUnitType.FACULTY]
+    department_units = [f for f in org_units if f.unit_type == OrgUnitType.DEPARTMENT]
+
     faculty_status_rows = (
         await db.execute(select(Ticket.faculty_id, Ticket.status, func.count()).group_by(Ticket.faculty_id, Ticket.status))
     ).all()
@@ -54,8 +65,8 @@ async def get_dashboard_stats(db: AsyncSession = Depends(get_db)):
     for faculty_id, ticket_status, count in faculty_status_rows:
         faculty_counts[faculty_id][ticket_status] = count
 
-    faculty_stats = [
-        FacultyStat(
+    def _build_faculty_stat(f: Faculty) -> FacultyStat:
+        return FacultyStat(
             faculty_id=f.id,
             faculty_name=f.name,
             total=sum(faculty_counts.get(f.id, {}).values()),
@@ -63,8 +74,9 @@ async def get_dashboard_stats(db: AsyncSession = Depends(get_db)):
             in_progress=faculty_counts.get(f.id, {}).get(TicketStatus.IN_PROGRESS, 0),
             closed=faculty_counts.get(f.id, {}).get(TicketStatus.CLOSED, 0),
         )
-        for f in faculties
-    ]
+
+    faculty_stats = [_build_faculty_stat(f) for f in faculty_units]
+    department_stats = [_build_faculty_stat(f) for f in department_units]
 
     technicians = (
         await db.execute(select(User).where(User.role.in_([UserRole.TECHNICIAN_MAIN, UserRole.TECHNICIAN_BACKUP])))
@@ -128,7 +140,7 @@ async def get_dashboard_stats(db: AsyncSession = Depends(get_db)):
             u.id: u
             for u in (await db.execute(select(User).where(User.id.in_(reporter_user_ids)))).scalars().all()
         }
-    faculty_names = {f.id: f.name for f in faculties}
+    faculty_names = {f.id: f.name for f in org_units}
 
     reporter_stats = []
     for row in reporter_rows:
@@ -196,7 +208,7 @@ async def get_dashboard_stats(db: AsyncSession = Depends(get_db)):
             in_repair=inventory_faculty_counts.get(f.id, {}).get(INVENTORY_STATUS_IN_REPAIR, 0),
             decommissioned=inventory_faculty_counts.get(f.id, {}).get(INVENTORY_STATUS_DECOMMISSIONED, 0),
         )
-        for f in faculties
+        for f in org_units
     ]
 
     return DashboardStats(
@@ -205,6 +217,7 @@ async def get_dashboard_stats(db: AsyncSession = Depends(get_db)):
         in_progress_tickets=in_progress_tickets,
         closed_tickets=closed_tickets,
         faculty_stats=faculty_stats,
+        department_stats=department_stats,
         technician_stats=technician_stats,
         reporter_stats=reporter_stats,
         category_stats=category_stats,
