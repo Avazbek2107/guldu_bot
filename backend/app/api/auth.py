@@ -24,6 +24,12 @@ MAX_LOGIN_ATTEMPTS = 5
 LOCKOUT_MINUTES = 15
 COOKIE_NAME = "access_token"
 
+# A fixed, valid bcrypt hash with no matching plaintext — verified against on
+# every login attempt for a username that doesn't exist, so a nonexistent
+# username takes the same bcrypt-verify time as a real one instead of
+# returning early and leaking account existence through response timing.
+_DUMMY_PASSWORD_HASH = "$2b$12$ZIj2L72fIPu6VbaLbsxie.zt4r7s9S3EWuQ.3m8PaOfQmf7PMWgrK"
+
 AVATAR_MAX_BYTES = 2 * 1024 * 1024
 AVATAR_ALLOWED_TYPES = {"image/jpeg": "jpg", "image/png": "png", "image/webp": "webp"}
 
@@ -63,7 +69,9 @@ async def login(payload: LoginRequest, response: Response, db: AsyncSession = De
             detail=f"Hisobingiz vaqtincha bloklangan. {remaining_minutes} daqiqadan keyin qayta urinib ko'ring.",
         )
 
-    if user is None or user.password_hash is None or not verify_password(payload.password, user.password_hash):
+    password_hash_to_check = user.password_hash if user is not None and user.password_hash is not None else _DUMMY_PASSWORD_HASH
+    password_ok = verify_password(payload.password, password_hash_to_check)
+    if user is None or user.password_hash is None or not password_ok:
         if user is not None:
             user.failed_login_attempts += 1
             if user.failed_login_attempts >= MAX_LOGIN_ATTEMPTS:

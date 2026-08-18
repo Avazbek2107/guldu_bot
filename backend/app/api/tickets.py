@@ -252,10 +252,10 @@ async def close_ticket(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="Inventar topilmadi yoki bu fakultetga tegishli emas",
         )
-    if inventory_item.status == "hisobdan chiqarilgan":
+    if inventory_item.status == "Yaroqsiz":
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Bu inventar hisobdan chiqarilgan, arizani unga bog'lab bo'lmaydi",
+            detail="Bu inventar yaroqsiz deb belgilangan, arizani unga bog'lab bo'lmaydi",
         )
 
     ticket.status = TicketStatus.CLOSED

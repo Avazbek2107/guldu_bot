@@ -56,6 +56,24 @@ def _resource_for_role(role: UserRole) -> str:
     return "end_users" if role == UserRole.FACULTY_STAFF else "users"
 
 
+def _scoped_permissions(current_user: User, permissions: dict[str, list[str]] | None) -> dict[str, list[str]] | None:
+    """An Admin may only grant a new fellow-Admin permissions they themselves
+    hold — otherwise an Admin with e.g. just "users:create" could mint a
+    brand-new Admin account with full access to every resource. Super Admin
+    is unrestricted."""
+    if current_user.role == UserRole.SUPER_ADMIN or not permissions:
+        return permissions
+    own = current_user.permissions or {}
+    for resource, actions in permissions.items():
+        allowed = set(own.get(resource, []))
+        not_held = [a for a in actions if a not in allowed]
+        if not_held:
+            raise ValueError(
+                f"'{resource}' bo'limida o'zingizda yo'q ruxsatni ('{', '.join(not_held)}') bera olmaysiz"
+            )
+    return permissions
+
+
 def _can_manage_target_role(current_user: User, target_role: UserRole, action: str = "manage") -> bool:
     # A Super Admin account can never be created, edited, blocked or deleted by
     # anyone but a real Super Admin — there's only ever meant to be one, bootstrapped
@@ -145,6 +163,11 @@ async def create_user(
         current_user, payload.role, action="create"
     ):
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Bu amal uchun ruxsatingiz yo'q")
+    try:
+        cleaned_permissions = validate_permissions(payload.role, payload.permissions)
+        cleaned_permissions = _scoped_permissions(current_user, cleaned_permissions)
+    except ValueError as exc:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc)) from exc
     user = User(
         username=payload.username,
         password_hash=hash_password(payload.password),
@@ -152,7 +175,7 @@ async def create_user(
         phone=payload.phone,
         role=payload.role,
         faculty_id=None,
-        permissions=payload.permissions if payload.role == UserRole.ADMIN else None,
+        permissions=cleaned_permissions,
         telegram_id=payload.telegram_id,
     )
     db.add(user)
@@ -207,7 +230,7 @@ async def update_user(
             validate_faculty_assignments(user.role, payload.faculty_assignments)
             await _apply_assignments(db, user, payload.faculty_assignments)
         if payload.permissions is not None:
-            user.permissions = validate_permissions(user.role, payload.permissions)
+            user.permissions = _scoped_permissions(current_user, validate_permissions(user.role, payload.permissions))
         await db.commit()
     except ValueError as exc:
         await db.rollback()
