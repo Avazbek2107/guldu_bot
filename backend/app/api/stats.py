@@ -19,6 +19,7 @@ from app.schemas.stats import (
     FacultyStat,
     InventoryFacultyStat,
     InventoryStatusStat,
+    InventoryTypeStat,
     ReporterStat,
     TechnicianStat,
 )
@@ -28,10 +29,9 @@ router = APIRouter(prefix="/stats", tags=["stats"])
 TREND_DAYS = 30
 TOP_REPORTERS_LIMIT = 15
 
-INVENTORY_STATUS_WORKING = "ishchi"
-INVENTORY_STATUS_BROKEN = "nosoz"
-INVENTORY_STATUS_IN_REPAIR = "ta'mirlanmoqda"
-INVENTORY_STATUS_DECOMMISSIONED = "hisobdan chiqarilgan"
+INVENTORY_STATUS_WORKING = "Ishchi"
+INVENTORY_STATUS_NEEDS_REPAIR = "Ta'mir talab"
+INVENTORY_STATUS_UNUSABLE = "Yaroqsiz"
 
 
 @router.get("/dashboard", response_model=DashboardStats, dependencies=[Depends(require_permission("dashboard", "view"))])
@@ -187,6 +187,19 @@ async def get_dashboard_stats(db: AsyncSession = Depends(get_db)):
     total_inventory_items = sum(count for _, count in inventory_status_rows)
     inventory_status_stats = [InventoryStatusStat(status=st, count=count) for st, count in inventory_status_rows]
 
+    inventory_type_rows = (
+        await db.execute(select(InventoryItem.inventory_type, func.count()).group_by(InventoryItem.inventory_type))
+    ).all()
+    inventory_type_stats = [
+        InventoryTypeStat(inventory_type=t or "Belgilanmagan", count=count) for t, count in inventory_type_rows
+    ]
+
+    # Inventory can be recorded directly against a kafedra, which isn't in
+    # org_units (top-level only) — roll each item up to its top-level
+    # faculty/bo'lim so it isn't silently dropped from this breakdown.
+    all_faculties = (await db.execute(select(Faculty.id, Faculty.parent_id))).all()
+    top_level_of: dict[int, int] = {fid: (pid if pid is not None else fid) for fid, pid in all_faculties}
+
     inventory_faculty_rows = (
         await db.execute(
             select(InventoryItem.faculty_id, InventoryItem.status, func.count()).group_by(
@@ -196,7 +209,10 @@ async def get_dashboard_stats(db: AsyncSession = Depends(get_db)):
     ).all()
     inventory_faculty_counts: dict[int, dict[str, int]] = defaultdict(dict)
     for faculty_id, item_status, count in inventory_faculty_rows:
-        inventory_faculty_counts[faculty_id][item_status] = count
+        top_level_id = top_level_of.get(faculty_id, faculty_id)
+        inventory_faculty_counts[top_level_id][item_status] = (
+            inventory_faculty_counts[top_level_id].get(item_status, 0) + count
+        )
 
     inventory_faculty_stats = [
         InventoryFacultyStat(
@@ -204,9 +220,8 @@ async def get_dashboard_stats(db: AsyncSession = Depends(get_db)):
             faculty_name=f.name,
             total=sum(inventory_faculty_counts.get(f.id, {}).values()),
             working=inventory_faculty_counts.get(f.id, {}).get(INVENTORY_STATUS_WORKING, 0),
-            broken=inventory_faculty_counts.get(f.id, {}).get(INVENTORY_STATUS_BROKEN, 0),
-            in_repair=inventory_faculty_counts.get(f.id, {}).get(INVENTORY_STATUS_IN_REPAIR, 0),
-            decommissioned=inventory_faculty_counts.get(f.id, {}).get(INVENTORY_STATUS_DECOMMISSIONED, 0),
+            needs_repair=inventory_faculty_counts.get(f.id, {}).get(INVENTORY_STATUS_NEEDS_REPAIR, 0),
+            unusable=inventory_faculty_counts.get(f.id, {}).get(INVENTORY_STATUS_UNUSABLE, 0),
         )
         for f in org_units
     ]
@@ -226,5 +241,6 @@ async def get_dashboard_stats(db: AsyncSession = Depends(get_db)):
         daily_trend=daily_trend,
         total_inventory_items=total_inventory_items,
         inventory_status_stats=inventory_status_stats,
+        inventory_type_stats=inventory_type_stats,
         inventory_faculty_stats=inventory_faculty_stats,
     )

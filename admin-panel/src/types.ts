@@ -235,14 +235,18 @@ export interface InventoryStatusStat {
   count: number;
 }
 
+export interface InventoryTypeStat {
+  inventory_type: string;
+  count: number;
+}
+
 export interface InventoryFacultyStat {
   faculty_id: number;
   faculty_name: string;
   total: number;
   working: number;
-  broken: number;
-  in_repair: number;
-  decommissioned: number;
+  needs_repair: number;
+  unusable: number;
 }
 
 export interface DashboardStats {
@@ -260,5 +264,6 @@ export interface DashboardStats {
   daily_trend: DailyCount[];
   total_inventory_items: number;
   inventory_status_stats: InventoryStatusStat[];
+  inventory_type_stats: InventoryTypeStat[];
   inventory_faculty_stats: InventoryFacultyStat[];
 }

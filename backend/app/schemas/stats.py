@@ -49,14 +49,18 @@ class InventoryStatusStat(BaseModel):
     count: int
 
 
+class InventoryTypeStat(BaseModel):
+    inventory_type: str
+    count: int
+
+
 class InventoryFacultyStat(BaseModel):
     faculty_id: int
     faculty_name: str
     total: int
     working: int
-    broken: int
-    in_repair: int
-    decommissioned: int
+    needs_repair: int
+    unusable: int
 
 
 class DashboardStats(BaseModel):
@@ -74,4 +78,5 @@ class DashboardStats(BaseModel):
     daily_trend: list[DailyCount]
     total_inventory_items: int
     inventory_status_stats: list[InventoryStatusStat]
+    inventory_type_stats: list[InventoryTypeStat]
     inventory_faculty_stats: list[InventoryFacultyStat]

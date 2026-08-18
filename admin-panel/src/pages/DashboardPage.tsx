@@ -52,18 +52,10 @@ const STATUS_COLORS: Record<string, string> = {
   Yopilgan: GREEN,
 };
 
-const INVENTORY_STATUS_LABELS: Record<string, string> = {
-  ishchi: "Ishchi",
-  nosoz: "Nosoz",
-  "ta'mirlanmoqda": "Ta'mirlanmoqda",
-  "hisobdan chiqarilgan": "Hisobdan chiqarilgan",
-};
-
 const INVENTORY_STATUS_COLORS: Record<string, string> = {
   Ishchi: GREEN,
-  Nosoz: RED,
-  "Ta'mirlanmoqda": YELLOW,
-  "Hisobdan chiqarilgan": INK_MUTED,
+  "Ta'mir talab": YELLOW,
+  Yaroqsiz: RED,
 };
 
 function KpiIcon({ icon, tint }: { icon: ReactNode; tint: string }) {
@@ -186,9 +178,12 @@ export function DashboardPage() {
     .sort((a, b) => b.count - a.count);
 
   const inventoryStatusData = stats.inventory_status_stats.map((s) => ({
-    name: INVENTORY_STATUS_LABELS[s.status] ?? s.status,
+    name: s.status,
     value: s.count,
   }));
+  const inventoryTypeData = stats.inventory_type_stats
+    .map((t) => ({ name: t.inventory_type, count: t.count }))
+    .sort((a, b) => b.count - a.count);
   const totalInventoryStatusCount = inventoryStatusData.reduce((sum, d) => sum + d.value, 0);
   function inventoryLegendFormatter(value: string) {
     const item = inventoryStatusData.find((d) => d.name === value);
@@ -600,22 +595,42 @@ export function DashboardPage() {
                   render: (v: number) => <CountTag value={v} color={GREEN} />,
                 },
                 {
-                  title: "Nosoz",
-                  dataIndex: "broken",
-                  render: (v: number) => <CountTag value={v} color={RED} />,
-                },
-                {
-                  title: "Ta'mirlanmoqda",
-                  dataIndex: "in_repair",
+                  title: "Ta'mir talab",
+                  dataIndex: "needs_repair",
                   render: (v: number) => <CountTag value={v} color={YELLOW} />,
                 },
                 {
-                  title: "Hisobdan chiqarilgan",
-                  dataIndex: "decommissioned",
-                  render: (v: number) => <CountTag value={v} color={INK_MUTED} />,
+                  title: "Yaroqsiz",
+                  dataIndex: "unusable",
+                  render: (v: number) => <CountTag value={v} color={RED} />,
                 },
               ]}
             />
+          </Card>
+        </Col>
+      </Row>
+
+      <Row gutter={[16, 16]} style={{ marginTop: 16 }}>
+        <Col span={24}>
+          <Card title="Inventar toifasi bo'yicha statistika" style={CARD_STYLE}>
+            <ResponsiveContainer width="100%" height={Math.max(260, inventoryTypeData.length * 32)}>
+              <BarChart data={inventoryTypeData} layout="vertical" margin={{ left: 8, right: 24 }}>
+                <CartesianGrid horizontal={false} stroke={GRIDLINE} />
+                <XAxis type="number" allowDecimals={false} tick={{ fontSize: 11, fill: INK_MUTED }} axisLine={{ stroke: GRIDLINE }} tickLine={false} />
+                <YAxis
+                  type="category"
+                  dataKey="name"
+                  width={130}
+                  tick={{ fontSize: 11, fill: INK_SECONDARY }}
+                  axisLine={{ stroke: GRIDLINE }}
+                  tickLine={false}
+                />
+                <Tooltip content={<ChartTooltip />} cursor={{ fill: "rgba(42,120,214,0.06)" }} />
+                <Bar dataKey="count" fill={BLUE} radius={[0, 4, 4, 0]} maxBarSize={20} name="Soni">
+                  <LabelList dataKey="count" position="right" style={{ fill: INK_SECONDARY, fontSize: 11 }} />
+                </Bar>
+              </BarChart>
+            </ResponsiveContainer>
           </Card>
         </Col>
       </Row>
