@@ -395,13 +395,13 @@ export function DashboardPage() {
       </Row>
 
       <Row gutter={[16, 16]} style={{ marginTop: 16 }}>
-        <Col xs={24} lg={8}>
+        <Col xs={24} lg={12}>
           <Card title="Fakultetlar kesimida statistika" style={CARD_STYLE}>
             <Table
               size="small"
               rowKey="faculty_id"
               pagination={false}
-              scroll={{ x: "max-content" }}
+              scroll={{ x: "max-content", y: 400 }}
               dataSource={stats.faculty_stats}
               columns={[
                 { title: "Fakultet", dataIndex: "faculty_name" },
@@ -425,13 +425,13 @@ export function DashboardPage() {
             />
           </Card>
         </Col>
-        <Col xs={24} lg={8}>
+        <Col xs={24} lg={12}>
           <Card title="Bo'limlar kesimida statistika" style={CARD_STYLE}>
             <Table
               size="small"
               rowKey="faculty_id"
               pagination={false}
-              scroll={{ x: "max-content" }}
+              scroll={{ x: "max-content", y: 400 }}
               dataSource={stats.department_stats}
               columns={[
                 { title: "Bo'lim", dataIndex: "faculty_name" },
@@ -455,7 +455,10 @@ export function DashboardPage() {
             />
           </Card>
         </Col>
-        <Col xs={24} lg={8}>
+      </Row>
+
+      <Row gutter={[16, 16]} style={{ marginTop: 16 }}>
+        <Col span={24}>
           <Card title="Xodimlar ish samaradorligi" style={CARD_STYLE}>
             <Table
               size="small"
