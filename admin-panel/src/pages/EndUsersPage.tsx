@@ -6,7 +6,7 @@ import { ActionsMenu } from "../components/ActionsMenu";
 import { CARD_STYLE } from "../theme";
 import { useAuth } from "../auth/AuthContext";
 import { hasPermission } from "../auth/permissions";
-import { orgUnitLabel, type FacultyOut, type UserOut } from "../types";
+import { filterOptionByPrefix, orgUnitLabel, type FacultyOut, type UserOut } from "../types";
 
 export function EndUsersPage() {
   const { user: currentUser } = useAuth();
@@ -99,6 +99,8 @@ export function EndUsersPage() {
       <Space style={{ marginBottom: 16 }} wrap>
         <Select
           allowClear
+          showSearch
+          filterOption={filterOptionByPrefix}
           placeholder="Fakultet bo'yicha filtrlash"
           style={{ width: 240 }}
           value={facultyFilter}
@@ -215,7 +217,12 @@ export function EndUsersPage() {
             <Input />
           </Form.Item>
           <Form.Item name="faculty_id" label="Fakultet">
-            <Select allowClear options={faculties.map((f) => ({ value: f.id, label: orgUnitLabel(f) }))} />
+            <Select
+              allowClear
+              showSearch
+              filterOption={filterOptionByPrefix}
+              options={faculties.map((f) => ({ value: f.id, label: orgUnitLabel(f) }))}
+            />
           </Form.Item>
           <Form.Item
             name="telegram_id"

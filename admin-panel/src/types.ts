@@ -106,6 +106,16 @@ export function orgUnitLabel(f: FacultyOut): string {
   return f.unit_type === "department" ? `${f.name} (bo'lim)` : f.name;
 }
 
+/** antd Select `filterOption`: keeps only options whose label starts with the
+ * typed text (case-insensitive), for long lists like the fakultet/bo'lim
+ * picker where matching from the first letters is more useful than a
+ * substring-anywhere search. */
+export function filterOptionByPrefix(input: string, option?: { label?: unknown }): boolean {
+  return String(option?.label ?? "")
+    .toLowerCase()
+    .startsWith(input.toLowerCase());
+}
+
 export interface TicketOut {
   id: number;
   ticket_number: string;

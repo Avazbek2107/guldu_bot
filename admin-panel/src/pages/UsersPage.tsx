@@ -16,6 +16,7 @@ import { listFaculties } from "../api/faculties";
 import { useAuth } from "../auth/AuthContext";
 import { hasPermission } from "../auth/permissions";
 import {
+  filterOptionByPrefix,
   orgUnitLabel,
   ROLE_LABELS_UZ,
   type FacultyOut,
@@ -76,6 +77,8 @@ function FacultyAssignmentsList({ faculties }: { faculties: FacultyOut[] }) {
                 style={{ marginBottom: 0, flex: "1 1 160px" }}
               >
                 <Select
+                  showSearch
+                  filterOption={filterOptionByPrefix}
                   placeholder="Fakultet"
                   style={{ width: "100%", minWidth: 140 }}
                   options={faculties.map((f) => ({ value: f.id, label: orgUnitLabel(f) }))}

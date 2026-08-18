@@ -29,7 +29,14 @@ import { ActionsMenu } from "../components/ActionsMenu";
 import { CARD_STYLE } from "../theme";
 import { useAuth } from "../auth/AuthContext";
 import { hasPermission } from "../auth/permissions";
-import { orgUnitLabel, type FacultyOut, type InventoryItemOut, type RepairHistoryItem, type UserOut } from "../types";
+import {
+  filterOptionByPrefix,
+  orgUnitLabel,
+  type FacultyOut,
+  type InventoryItemOut,
+  type RepairHistoryItem,
+  type UserOut,
+} from "../types";
 
 const STATUS_OPTIONS = [
   { value: "ishchi", label: "Ishchi" },
@@ -217,6 +224,8 @@ export function InventoryPage() {
       <Space style={{ marginBottom: 16 }} wrap>
         <Select
           allowClear
+          showSearch
+          filterOption={filterOptionByPrefix}
           placeholder="Fakultet/bo'lim bo'yicha filtrlash"
           style={{ width: 260 }}
           value={facultyFilter}
@@ -345,6 +354,8 @@ export function InventoryPage() {
         <Form form={createForm} layout="vertical" onFinish={handleCreate} initialValues={{ status: "ishchi" }}>
           <Form.Item name="faculty_id" label="Fakultet/Bo'lim" rules={[{ required: true }]}>
             <Select
+              showSearch
+              filterOption={filterOptionByPrefix}
               options={faculties.map((f) => ({ value: f.id, label: orgUnitLabel(f) }))}
               onChange={() => createForm.setFieldValue("assigned_technician_id", undefined)}
             />
@@ -404,6 +415,8 @@ export function InventoryPage() {
         <Form form={editForm} layout="vertical" onFinish={handleEditSave}>
           <Form.Item name="faculty_id" label="Fakultet/Bo'lim" rules={[{ required: true }]}>
             <Select
+              showSearch
+              filterOption={filterOptionByPrefix}
               options={faculties.map((f) => ({ value: f.id, label: orgUnitLabel(f) }))}
               onChange={() => editForm.setFieldValue("assigned_technician_id", undefined)}
             />

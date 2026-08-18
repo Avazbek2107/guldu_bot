@@ -24,6 +24,7 @@ import { useAuth } from "../auth/AuthContext";
 import { hasPermission } from "../auth/permissions";
 import {
   CATEGORY_LABELS_UZ,
+  filterOptionByPrefix,
   orgUnitLabel,
   PRIORITY_LABELS_UZ,
   STATUS_LABELS_UZ,
@@ -190,6 +191,8 @@ export function TicketsPage() {
         {canSeeAllFaculties && (
           <Select
             allowClear
+            showSearch
+            filterOption={filterOptionByPrefix}
             placeholder="Fakultet"
             style={{ width: 180 }}
             value={facultyFilter}
