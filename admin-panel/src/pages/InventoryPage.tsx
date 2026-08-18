@@ -9,6 +9,7 @@ import {
   Space,
   Table,
   Tag,
+  TreeSelect,
   Typography,
   message,
 } from "antd";
@@ -29,28 +30,44 @@ import { ActionsMenu } from "../components/ActionsMenu";
 import { CARD_STYLE } from "../theme";
 import { useAuth } from "../auth/AuthContext";
 import { hasPermission } from "../auth/permissions";
-import {
-  filterOptionByPrefix,
-  orgUnitLabel,
-  type FacultyOut,
-  type InventoryItemOut,
-  type RepairHistoryItem,
-  type UserOut,
-} from "../types";
+import type { FacultyOut, InventoryItemOut, RepairHistoryItem, UserOut } from "../types";
 
 const STATUS_OPTIONS = [
-  { value: "ishchi", label: "Ishchi" },
-  { value: "nosoz", label: "Nosoz" },
-  { value: "ta'mirlanmoqda", label: "Ta'mirlanmoqda" },
-  { value: "hisobdan chiqarilgan", label: "Hisobdan chiqarilgan" },
+  { value: "Ishchi", label: "Ishchi" },
+  { value: "Ta'mir talab", label: "Ta'mir talab" },
+  { value: "Yaroqsiz", label: "Yaroqsiz" },
 ];
 
 const STATUS_COLORS: Record<string, string> = {
-  ishchi: "green",
-  nosoz: "red",
-  "ta'mirlanmoqda": "orange",
-  "hisobdan chiqarilgan": "default",
+  Ishchi: "green",
+  "Ta'mir talab": "orange",
+  Yaroqsiz: "red",
 };
+
+const INVENTORY_TYPE_OPTIONS = [
+  "Monoblok",
+  "Kompyuter",
+  "Noutbook",
+  "Server",
+  "Interaktiv panel",
+  "Wi-Fi",
+  "Printer",
+  "3in1 printer",
+  "Skaner",
+  "Proyektor",
+  "E-minbar",
+  "Televizor",
+  "Kamera",
+  "NVR",
+].map((v) => ({ value: v, label: v }));
+
+const MAC_ADDRESS_TYPES = new Set(["Monoblok", "Kompyuter", "Noutbook", "Interaktiv panel"]);
+
+interface LocationTreeNode {
+  title: string;
+  value: number;
+  children?: LocationTreeNode[];
+}
 
 export function InventoryPage() {
   const { user } = useAuth();
@@ -60,7 +77,8 @@ export function InventoryPage() {
   const canDelete = isTechnician || hasPermission(user, "inventory", "delete");
 
   const [items, setItems] = useState<InventoryItemOut[]>([]);
-  const [faculties, setFaculties] = useState<FacultyOut[]>([]);
+  const [locationTree, setLocationTree] = useState<LocationTreeNode[]>([]);
+  const [kafedras, setKafedras] = useState<FacultyOut[]>([]);
   const [technicians, setTechnicians] = useState<UserOut[]>([]);
   const [loading, setLoading] = useState(true);
   const [facultyFilter, setFacultyFilter] = useState<number | undefined>();
@@ -72,6 +90,8 @@ export function InventoryPage() {
   const [saving, setSaving] = useState(false);
   const createFacultyId = Form.useWatch("faculty_id", createForm);
   const editFacultyId = Form.useWatch("faculty_id", editForm);
+  const createInventoryType = Form.useWatch("inventory_type", createForm);
+  const editInventoryType = Form.useWatch("inventory_type", editForm);
 
   const [historyTarget, setHistoryTarget] = useState<InventoryItemOut | null>(null);
   const [history, setHistory] = useState<RepairHistoryItem[]>([]);
@@ -86,15 +106,28 @@ export function InventoryPage() {
     const requestId = ++requestIdRef.current;
     setLoading(true);
     try {
-      const [itemList, facultyList, mainTechs, backupTechs] = await Promise.all([
+      const [itemList, facultyList, departmentList, mainTechs, backupTechs] = await Promise.all([
         listInventory(facultyFilter),
-        listFaculties(undefined, { topLevel: true }),
+        listFaculties("faculty"),
+        listFaculties("department"),
         listUsers({ role: "technician_main" }),
         listUsers({ role: "technician_backup" }),
       ]);
       if (requestId === requestIdRef.current) {
+        const topLevelDepartments = departmentList.filter((d) => d.parent_id == null);
+        const kafedraList = departmentList.filter((d) => d.parent_id != null);
         setItems(itemList);
-        setFaculties(facultyList);
+        setKafedras(kafedraList);
+        setLocationTree([
+          ...facultyList.map((f) => ({
+            title: f.name,
+            value: f.id,
+            children: kafedraList
+              .filter((k) => k.parent_id === f.id)
+              .map((k) => ({ title: k.name, value: k.id })),
+          })),
+          ...topLevelDepartments.map((d) => ({ title: `${d.name} (bo'lim)`, value: d.id })),
+        ]);
         setTechnicians([...mainTechs, ...backupTechs]);
       }
     } finally {
@@ -109,11 +142,18 @@ export function InventoryPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [facultyFilter]);
 
+  function resolveScopeFacultyId(facultyId: number | undefined): number | undefined {
+    if (facultyId == null) return undefined;
+    const kafedra = kafedras.find((k) => k.id === facultyId);
+    return kafedra ? kafedra.parent_id ?? facultyId : facultyId;
+  }
+
   function technicianOptionsForFaculty(facultyId: number | undefined) {
-    if (!facultyId) return [];
+    const scopeId = resolveScopeFacultyId(facultyId);
+    if (!scopeId) return [];
     return technicians
       .map((t) => {
-        const assignment = (t.faculty_assignments ?? []).find((a) => a.faculty_id === facultyId);
+        const assignment = (t.faculty_assignments ?? []).find((a) => a.faculty_id === scopeId);
         if (!assignment) return null;
         return {
           value: t.id,
@@ -222,15 +262,15 @@ export function InventoryPage() {
   return (
     <div>
       <Space style={{ marginBottom: 16 }} wrap>
-        <Select
+        <TreeSelect
           allowClear
           showSearch
-          filterOption={filterOptionByPrefix}
+          treeNodeFilterProp="title"
           placeholder="Fakultet/bo'lim bo'yicha filtrlash"
-          style={{ width: 260 }}
+          style={{ width: 280 }}
           value={facultyFilter}
           onChange={setFacultyFilter}
-          options={faculties.map((f) => ({ value: f.id, label: orgUnitLabel(f) }))}
+          treeData={locationTree}
         />
         {canCreate && (
           <Button type="primary" icon={<PlusOutlined />} onClick={() => setCreateOpen(true)}>
@@ -261,8 +301,7 @@ export function InventoryPage() {
         scroll={{ x: "max-content" }}
         dataSource={items}
         columns={[
-          { title: "Fakultet/Bo'lim", dataIndex: "faculty_name" },
-          { title: "Kafedra/Bo'lim", dataIndex: "sub_unit", render: (v: string | null) => v ?? "-" },
+          { title: "Fakultet yoki Bo'lim", dataIndex: "faculty_name" },
           { title: "Xona", dataIndex: "room", render: (v: string | null) => v ?? "-" },
           { title: "Inventar №", dataIndex: "inventory_number", render: (v: string | null) => v ?? "-" },
           { title: "Inventar uzasbo", dataIndex: "uzasbo", render: (v: string | null) => v ?? "-" },
@@ -274,6 +313,7 @@ export function InventoryPage() {
             render: (v: string) => <Tag color={STATUS_COLORS[v] ?? "default"}>{v}</Tag>,
           },
           { title: "Internet", dataIndex: "internet_connection", render: (v: string | null) => v ?? "-" },
+          { title: "MAC manzili", dataIndex: "mac_address", render: (v: string | null) => v ?? "-" },
           { title: "Mas'ul shaxs", dataIndex: "responsible_person", render: (v: string | null) => v ?? "-" },
           {
             title: "Texnik xodim",
@@ -308,7 +348,6 @@ export function InventoryPage() {
                             setEditTarget(record);
                             editForm.setFieldsValue({
                               faculty_id: record.faculty_id,
-                              sub_unit: record.sub_unit ?? undefined,
                               room: record.room ?? undefined,
                               inventory_number: record.inventory_number ?? undefined,
                               uzasbo: record.uzasbo ?? undefined,
@@ -316,6 +355,7 @@ export function InventoryPage() {
                               model: record.model ?? undefined,
                               status: record.status,
                               internet_connection: record.internet_connection ?? undefined,
+                              mac_address: record.mac_address ?? undefined,
                               responsible_person: record.responsible_person ?? undefined,
                               assigned_technician_id: record.assigned_technician_id ?? undefined,
                             });
@@ -351,17 +391,14 @@ export function InventoryPage() {
         okText="Qo'shish"
         cancelText="Bekor qilish"
       >
-        <Form form={createForm} layout="vertical" onFinish={handleCreate} initialValues={{ status: "ishchi" }}>
-          <Form.Item name="faculty_id" label="Fakultet/Bo'lim" rules={[{ required: true }]}>
-            <Select
+        <Form form={createForm} layout="vertical" onFinish={handleCreate} initialValues={{ status: "Ishchi" }}>
+          <Form.Item name="faculty_id" label="Fakultet yoki Bo'lim" rules={[{ required: true }]}>
+            <TreeSelect
               showSearch
-              filterOption={filterOptionByPrefix}
-              options={faculties.map((f) => ({ value: f.id, label: orgUnitLabel(f) }))}
+              treeNodeFilterProp="title"
+              treeData={locationTree}
               onChange={() => createForm.setFieldValue("assigned_technician_id", undefined)}
             />
-          </Form.Item>
-          <Form.Item name="sub_unit" label="Kafedra/Bo'lim">
-            <Input />
           </Form.Item>
           <Form.Item name="room" label="Xona">
             <Input />
@@ -373,7 +410,7 @@ export function InventoryPage() {
             <Input />
           </Form.Item>
           <Form.Item name="inventory_type" label="Inventar toifasi">
-            <Input placeholder="Monoblok, Printer va h.k." />
+            <Select allowClear options={INVENTORY_TYPE_OPTIONS} />
           </Form.Item>
           <Form.Item name="model" label="Modeli">
             <Input />
@@ -384,6 +421,11 @@ export function InventoryPage() {
           <Form.Item name="internet_connection" label="Internetga ulanganligi">
             <Input placeholder="Masalan: internetga ulangan (kabeli bor)" />
           </Form.Item>
+          {createInventoryType && MAC_ADDRESS_TYPES.has(createInventoryType) && (
+            <Form.Item name="mac_address" label="MAC manzili">
+              <Input placeholder="Masalan: AA:BB:CC:DD:EE:FF" />
+            </Form.Item>
+          )}
           <Form.Item name="responsible_person" label="Mas'ul shaxs">
             <Input />
           </Form.Item>
@@ -413,16 +455,13 @@ export function InventoryPage() {
         cancelText="Bekor qilish"
       >
         <Form form={editForm} layout="vertical" onFinish={handleEditSave}>
-          <Form.Item name="faculty_id" label="Fakultet/Bo'lim" rules={[{ required: true }]}>
-            <Select
+          <Form.Item name="faculty_id" label="Fakultet yoki Bo'lim" rules={[{ required: true }]}>
+            <TreeSelect
               showSearch
-              filterOption={filterOptionByPrefix}
-              options={faculties.map((f) => ({ value: f.id, label: orgUnitLabel(f) }))}
+              treeNodeFilterProp="title"
+              treeData={locationTree}
               onChange={() => editForm.setFieldValue("assigned_technician_id", undefined)}
             />
-          </Form.Item>
-          <Form.Item name="sub_unit" label="Kafedra/Bo'lim">
-            <Input />
           </Form.Item>
           <Form.Item name="room" label="Xona">
             <Input />
@@ -434,7 +473,7 @@ export function InventoryPage() {
             <Input />
           </Form.Item>
           <Form.Item name="inventory_type" label="Inventar toifasi">
-            <Input />
+            <Select allowClear options={INVENTORY_TYPE_OPTIONS} />
           </Form.Item>
           <Form.Item name="model" label="Modeli">
             <Input />
@@ -445,6 +484,11 @@ export function InventoryPage() {
           <Form.Item name="internet_connection" label="Internetga ulanganligi">
             <Input />
           </Form.Item>
+          {editInventoryType && MAC_ADDRESS_TYPES.has(editInventoryType) && (
+            <Form.Item name="mac_address" label="MAC manzili">
+              <Input placeholder="Masalan: AA:BB:CC:DD:EE:FF" />
+            </Form.Item>
+          )}
           <Form.Item name="responsible_person" label="Mas'ul shaxs">
             <Input />
           </Form.Item>

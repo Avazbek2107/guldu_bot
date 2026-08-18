@@ -3,7 +3,6 @@ import type { InventoryImportResult, InventoryItemOut, RepairHistoryItem } from 
 
 export interface InventoryItemPayload {
   faculty_id: number;
-  sub_unit?: string | null;
   room?: string | null;
   inventory_number?: string | null;
   uzasbo?: string | null;
@@ -11,6 +10,7 @@ export interface InventoryItemPayload {
   model?: string | null;
   status?: string;
   internet_connection?: string | null;
+  mac_address?: string | null;
   responsible_person?: string | null;
   assigned_technician_id?: number | null;
 }

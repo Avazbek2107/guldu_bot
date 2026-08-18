@@ -144,7 +144,6 @@ export interface InventoryItemOut {
   id: number;
   faculty_id: number;
   faculty_name: string;
-  sub_unit: string | null;
   room: string | null;
   inventory_number: string | null;
   uzasbo: string | null;
@@ -152,6 +151,7 @@ export interface InventoryItemOut {
   model: string | null;
   status: string;
   internet_connection: string | null;
+  mac_address: string | null;
   responsible_person: string | null;
   assigned_technician_id: number | null;
   assigned_technician_name: string | null;

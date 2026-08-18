@@ -2,24 +2,44 @@ from datetime import datetime
 
 from pydantic import BaseModel, ConfigDict, Field
 
+INVENTORY_TYPE_OPTIONS: list[str] = [
+    "Monoblok",
+    "Kompyuter",
+    "Noutbook",
+    "Server",
+    "Interaktiv panel",
+    "Wi-Fi",
+    "Printer",
+    "3in1 printer",
+    "Skaner",
+    "Proyektor",
+    "E-minbar",
+    "Televizor",
+    "Kamera",
+    "NVR",
+]
+
+INVENTORY_STATUS_OPTIONS: list[str] = ["Ishchi", "Ta'mir talab", "Yaroqsiz"]
+
+MAC_ADDRESS_INVENTORY_TYPES: set[str] = {"Monoblok", "Kompyuter", "Noutbook", "Interaktiv panel"}
+
 
 class InventoryItemCreate(BaseModel):
     faculty_id: int
-    sub_unit: str | None = None
     room: str | None = None
     inventory_number: str | None = None
     uzasbo: str | None = None
     inventory_type: str | None = None
     model: str | None = None
-    status: str = Field(default="ishchi", max_length=64)
+    status: str = Field(default="Ishchi", max_length=64)
     internet_connection: str | None = None
+    mac_address: str | None = None
     responsible_person: str | None = None
     assigned_technician_id: int | None = None
 
 
 class InventoryItemUpdate(BaseModel):
     faculty_id: int | None = None
-    sub_unit: str | None = None
     room: str | None = None
     inventory_number: str | None = None
     uzasbo: str | None = None
@@ -27,6 +47,7 @@ class InventoryItemUpdate(BaseModel):
     model: str | None = None
     status: str | None = Field(default=None, max_length=64)
     internet_connection: str | None = None
+    mac_address: str | None = None
     responsible_person: str | None = None
     assigned_technician_id: int | None = None
 
@@ -37,7 +58,6 @@ class InventoryItemOut(BaseModel):
     id: int
     faculty_id: int
     faculty_name: str
-    sub_unit: str | None
     room: str | None
     inventory_number: str | None
     uzasbo: str | None
@@ -45,6 +65,7 @@ class InventoryItemOut(BaseModel):
     model: str | None
     status: str
     internet_connection: str | None
+    mac_address: str | None
     responsible_person: str | None
     assigned_technician_id: int | None
     assigned_technician_name: str | None

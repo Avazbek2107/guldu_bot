@@ -20,34 +20,52 @@ from app.schemas.inventory import (
     InventoryItemUpdate,
     RepairHistoryItem,
 )
-from app.services.inventory_excel import generate_inventory_xlsx, parse_inventory_rows
+from app.services.inventory_excel import (
+    faculty_location_label,
+    generate_inventory_xlsx,
+    parse_inventory_rows,
+)
 
 router = APIRouter(prefix="/inventory", tags=["inventory"])
 
 TECHNICIAN_ROLES = (UserRole.TECHNICIAN_MAIN, UserRole.TECHNICIAN_BACKUP)
 
 
-def _check_access(current_user: User, faculty_id: int, action: str = "edit") -> None:
+async def _expand_with_kafedras(db: AsyncSession, faculty_ids: set[int]) -> set[int]:
+    """A technician assigned to a top-level faculty/bo'lim also manages inventory
+    recorded under that unit's kafedras, since kafedras don't get their own
+    TechnicianFacultyAssignment rows."""
+    if not faculty_ids:
+        return faculty_ids
+    kafedra_ids = (
+        await db.execute(select(Faculty.id).where(Faculty.parent_id.in_(faculty_ids)))
+    ).scalars().all()
+    return faculty_ids | set(kafedra_ids)
+
+
+async def _check_access(db: AsyncSession, current_user: User, faculty_id: int, action: str = "edit") -> None:
     if current_user.role == UserRole.SUPER_ADMIN:
         return
     if current_user.role == UserRole.ADMIN and has_permission(current_user, "inventory", action):
         return
-    if current_user.role in TECHNICIAN_ROLES and faculty_id in technician_faculty_ids(current_user):
-        return
+    if current_user.role in TECHNICIAN_ROLES:
+        allowed = await _expand_with_kafedras(db, technician_faculty_ids(current_user))
+        if faculty_id in allowed:
+            return
     raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Bu amal uchun ruxsatingiz yo'q")
 
 
-async def _lookup_main_technician_id(db: AsyncSession, faculty_id: int) -> int | None:
+async def _lookup_main_technician_id(db: AsyncSession, scope_faculty_id: int) -> int | None:
     result = await db.execute(
         select(TechnicianFacultyAssignment.user_id).where(
-            TechnicianFacultyAssignment.faculty_id == faculty_id,
+            TechnicianFacultyAssignment.faculty_id == scope_faculty_id,
             TechnicianFacultyAssignment.role == TechnicianFacultyRole.TECHNICIAN_MAIN,
         )
     )
     return result.scalar_one_or_none()
 
 
-async def _validate_assigned_technician(db: AsyncSession, technician_id: int | None, faculty_id: int) -> None:
+async def _validate_assigned_technician(db: AsyncSession, technician_id: int | None, scope_faculty_id: int) -> None:
     if technician_id is None:
         return
     technician = await db.get(User, technician_id)
@@ -56,7 +74,7 @@ async def _validate_assigned_technician(db: AsyncSession, technician_id: int | N
     result = await db.execute(
         select(TechnicianFacultyAssignment.id).where(
             TechnicianFacultyAssignment.user_id == technician_id,
-            TechnicianFacultyAssignment.faculty_id == faculty_id,
+            TechnicianFacultyAssignment.faculty_id == scope_faculty_id,
         )
     )
     if result.scalar_one_or_none() is None:
@@ -77,7 +95,6 @@ def _to_out(
         id=item.id,
         faculty_id=item.faculty_id,
         faculty_name=faculty_name,
-        sub_unit=item.sub_unit,
         room=item.room,
         inventory_number=item.inventory_number,
         uzasbo=item.uzasbo,
@@ -85,6 +102,7 @@ def _to_out(
         model=item.model,
         status=item.status,
         internet_connection=item.internet_connection,
+        mac_address=item.mac_address,
         responsible_person=item.responsible_person,
         assigned_technician_id=item.assigned_technician_id,
         assigned_technician_name=technician_name,
@@ -109,13 +127,22 @@ async def _serialize_one(db: AsyncSession, item: InventoryItem, faculty_name: st
     return _to_out(item, faculty_name, technician_name, stats[0] or 0, stats[1])
 
 
+async def _faculty_location_name(db: AsyncSession, faculty: Faculty) -> str:
+    if faculty.parent_id is None:
+        return faculty.name
+    parent = await db.get(Faculty, faculty.parent_id)
+    return faculty_location_label(faculty.name, parent.name if parent else None)
+
+
 async def _fetch_inventory(
     db: AsyncSession, current_user: User, faculty_id: int | None
 ) -> list[InventoryItemOut]:
     technician_alias = aliased(User)
+    parent_alias = aliased(Faculty)
     query = (
-        select(InventoryItem, Faculty.name, technician_alias.full_name)
+        select(InventoryItem, Faculty.name, parent_alias.name, technician_alias.full_name)
         .join(Faculty, InventoryItem.faculty_id == Faculty.id)
+        .outerjoin(parent_alias, Faculty.parent_id == parent_alias.id)
         .outerjoin(technician_alias, InventoryItem.assigned_technician_id == technician_alias.id)
     )
 
@@ -125,7 +152,7 @@ async def _fetch_inventory(
         if faculty_id is not None:
             query = query.where(InventoryItem.faculty_id == faculty_id)
     elif current_user.role in TECHNICIAN_ROLES:
-        allowed = technician_faculty_ids(current_user)
+        allowed = await _expand_with_kafedras(db, technician_faculty_ids(current_user))
         if not allowed:
             return []
         if faculty_id is not None:
@@ -141,7 +168,7 @@ async def _fetch_inventory(
     if not rows:
         return []
 
-    item_ids = [item.id for item, _, _ in rows]
+    item_ids = [item.id for item, _, _, _ in rows]
     repair_rows = (
         await db.execute(
             select(Ticket.inventory_item_id, func.count(Ticket.id), func.max(Ticket.closed_at))
@@ -152,8 +179,8 @@ async def _fetch_inventory(
     repair_map = {r[0]: (r[1], r[2]) for r in repair_rows}
 
     return [
-        _to_out(item, faculty_name, technician_name, *repair_map.get(item.id, (0, None)))
-        for item, faculty_name, technician_name in rows
+        _to_out(item, faculty_location_label(name, parent_name), technician_name, *repair_map.get(item.id, (0, None)))
+        for item, name, parent_name, technician_name in rows
     ]
 
 
@@ -173,7 +200,15 @@ async def export_inventory(
     current_user: User = Depends(get_current_user),
 ):
     items = await _fetch_inventory(db, current_user, faculty_id)
-    content = generate_inventory_xlsx(items)
+    all_faculties = (await db.execute(select(Faculty))).scalars().all()
+    by_id = {f.id: f for f in all_faculties}
+    location_options = sorted(
+        {
+            faculty_location_label(f.name, by_id[f.parent_id].name if f.parent_id in by_id else None)
+            for f in all_faculties
+        }
+    )
+    content = generate_inventory_xlsx(items, location_options)
     return Response(
         content=content,
         media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
@@ -200,7 +235,13 @@ async def import_inventory(
         ) from exc
 
     faculties = (await db.execute(select(Faculty))).scalars().all()
-    faculty_by_name = {f.name.strip().lower(): f for f in faculties}
+    by_id = {f.id: f for f in faculties}
+    faculty_by_label = {
+        faculty_location_label(f.name, by_id[f.parent_id].name if f.parent_id in by_id else None)
+        .strip()
+        .lower(): f
+        for f in faculties
+    }
 
     main_tech_rows = (
         await db.execute(
@@ -214,27 +255,28 @@ async def import_inventory(
     created = 0
     skipped: list[InventoryImportSkip] = []
     for row in rows:
-        faculty = faculty_by_name.get(row.faculty_name.strip().lower())
+        faculty = faculty_by_label.get(row.location_label.strip().lower())
         if faculty is None:
             skipped.append(
                 InventoryImportSkip(
-                    row=row.row_number, reason=f"Fakultet/bo'lim topilmadi: '{row.faculty_name}'"
+                    row=row.row_number, reason=f"Fakultet/bo'lim topilmadi: '{row.location_label}'"
                 )
             )
             continue
+        scope_faculty_id = faculty.parent_id if faculty.parent_id is not None else faculty.id
         db.add(
             InventoryItem(
                 faculty_id=faculty.id,
-                sub_unit=row.sub_unit,
                 room=row.room,
                 inventory_number=row.inventory_number,
                 uzasbo=row.uzasbo,
                 inventory_type=row.inventory_type,
                 model=row.model,
-                status=row.status or "ishchi",
+                status=row.status or "Ishchi",
                 internet_connection=row.internet_connection,
+                mac_address=row.mac_address,
                 responsible_person=row.responsible_person,
-                assigned_technician_id=main_technician_by_faculty.get(faculty.id),
+                assigned_technician_id=main_technician_by_faculty.get(scope_faculty_id),
             )
         )
         created += 1
@@ -252,7 +294,7 @@ async def get_inventory_history(
     item = await db.get(InventoryItem, item_id)
     if item is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Inventar topilmadi")
-    _check_access(current_user, item.faculty_id, "view")
+    await _check_access(db, current_user, item.faculty_id, "view")
 
     technician_alias = aliased(User)
     rows = (
@@ -282,16 +324,17 @@ async def create_inventory_item(
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-    _check_access(current_user, payload.faculty_id, "create")
+    await _check_access(db, current_user, payload.faculty_id, "create")
     faculty = await db.get(Faculty, payload.faculty_id)
     if faculty is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Fakultet/bo'lim topilmadi")
+    scope_faculty_id = faculty.parent_id if faculty.parent_id is not None else faculty.id
 
     data = payload.model_dump()
     if data.get("assigned_technician_id") is None:
-        data["assigned_technician_id"] = await _lookup_main_technician_id(db, payload.faculty_id)
+        data["assigned_technician_id"] = await _lookup_main_technician_id(db, scope_faculty_id)
     else:
-        await _validate_assigned_technician(db, data["assigned_technician_id"], payload.faculty_id)
+        await _validate_assigned_technician(db, data["assigned_technician_id"], scope_faculty_id)
 
     item = InventoryItem(**data)
     db.add(item)
@@ -301,7 +344,7 @@ async def create_inventory_item(
         await db.rollback()
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Ma'lumotlar noto'g'ri") from exc
     await db.refresh(item)
-    return await _serialize_one(db, item, faculty.name)
+    return await _serialize_one(db, item, await _faculty_location_name(db, faculty))
 
 
 @router.patch("/{item_id}", response_model=InventoryItemOut)
@@ -314,18 +357,22 @@ async def update_inventory_item(
     item = await db.get(InventoryItem, item_id)
     if item is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Inventar topilmadi")
-    _check_access(current_user, item.faculty_id)
+    await _check_access(db, current_user, item.faculty_id)
 
     data = payload.model_dump(exclude_unset=True)
     target_faculty_id = data.get("faculty_id", item.faculty_id)
+    target_faculty = None
     if target_faculty_id != item.faculty_id:
-        _check_access(current_user, target_faculty_id)
+        await _check_access(db, current_user, target_faculty_id)
         target_faculty = await db.get(Faculty, target_faculty_id)
         if target_faculty is None:
             raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Fakultet/bo'lim topilmadi")
+    else:
+        target_faculty = await db.get(Faculty, target_faculty_id)
+    scope_faculty_id = target_faculty.parent_id if target_faculty.parent_id is not None else target_faculty.id
 
     if "assigned_technician_id" in data:
-        await _validate_assigned_technician(db, data["assigned_technician_id"], target_faculty_id)
+        await _validate_assigned_technician(db, data["assigned_technician_id"], scope_faculty_id)
     elif target_faculty_id != item.faculty_id and item.assigned_technician_id is not None:
         # Faculty is changing but no new technician was specified — clear the
         # now-stale assignment rather than silently leaving a technician from
@@ -342,7 +389,7 @@ async def update_inventory_item(
     await db.refresh(item)
 
     faculty = await db.get(Faculty, item.faculty_id)
-    return await _serialize_one(db, item, faculty.name)
+    return await _serialize_one(db, item, await _faculty_location_name(db, faculty))
 
 
 @router.delete("/{item_id}", status_code=status.HTTP_204_NO_CONTENT)
@@ -354,6 +401,6 @@ async def delete_inventory_item(
     item = await db.get(InventoryItem, item_id)
     if item is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Inventar topilmadi")
-    _check_access(current_user, item.faculty_id, "delete")
+    await _check_access(db, current_user, item.faculty_id, "delete")
     await db.delete(item)
     await db.commit()
