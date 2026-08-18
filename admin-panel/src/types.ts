@@ -99,6 +99,7 @@ export interface FacultyOut {
   id: number;
   name: string;
   unit_type: OrgUnitType;
+  parent_id: number | null;
 }
 
 export function orgUnitLabel(f: FacultyOut): string {
@@ -118,6 +119,7 @@ export interface TicketOut {
   status: TicketStatus;
   assigned_technician_id: number | null;
   technician_full_name: string | null;
+  default_technician_name: string | null;
   resolution_comment: string | null;
   is_suspicious: boolean;
   created_at: string;

@@ -120,7 +120,7 @@ export function TicketsPage() {
   }
 
   useEffect(() => {
-    listFaculties().then(setFaculties);
+    listFaculties(undefined, { topLevel: true }).then(setFaculties);
     listUsers({ role: "technician_main" }).then((mainTechs) =>
       listUsers({ role: "technician_backup" }).then((backupTechs) =>
         setTechnicians([...mainTechs, ...backupTechs]),

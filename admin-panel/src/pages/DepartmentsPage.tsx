@@ -1,7 +1,15 @@
 import { useEffect, useRef, useState, type ChangeEvent } from "react";
 import { Button, Card, Form, Input, Modal, Space, Table, message } from "antd";
 import { DownloadOutlined, PlusOutlined, UploadOutlined } from "@ant-design/icons";
-import { createFaculty, exportFaculties, importFaculties, listFaculties, updateFaculty } from "../api/faculties";
+import {
+  createFaculty,
+  deleteFaculty,
+  exportFaculties,
+  importFaculties,
+  listFaculties,
+  updateFaculty,
+} from "../api/faculties";
+import { ActionsMenu, type ActionItem } from "../components/ActionsMenu";
 import { listUsers } from "../api/users";
 import { CARD_STYLE } from "../theme";
 import { useAuth } from "../auth/AuthContext";
@@ -12,6 +20,7 @@ export function DepartmentsPage() {
   const { user } = useAuth();
   const canCreate = hasPermission(user, "departments", "create");
   const canEdit = hasPermission(user, "departments", "edit");
+  const canDelete = hasPermission(user, "departments", "delete");
 
   const [departments, setDepartments] = useState<FacultyOut[]>([]);
   const [technicians, setTechnicians] = useState<UserOut[]>([]);
@@ -31,7 +40,7 @@ export function DepartmentsPage() {
     setLoading(true);
     try {
       const [departmentList, mainTechs, backupTechs] = await Promise.all([
-        listFaculties("department"),
+        listFaculties("department", { topLevel: true }),
         listUsers({ role: "technician_main" }),
         listUsers({ role: "technician_backup" }),
       ]);
@@ -80,6 +89,16 @@ export function DepartmentsPage() {
       message.error("Xatolik yuz berdi");
     } finally {
       setSaving(false);
+    }
+  }
+
+  async function handleDelete(department: FacultyOut) {
+    try {
+      await deleteFaculty(department.id);
+      message.success("O'chirildi");
+      loadData();
+    } catch {
+      message.error("O'chirib bo'lmadi: bunga bog'liq xodimlar, arizalar yoki inventar mavjud");
     }
   }
 
@@ -169,24 +188,34 @@ export function DepartmentsPage() {
             key: "backup",
             render: (_: unknown, record: FacultyOut) => techniciansFor(record.id, "technician_backup"),
           },
-          ...(canEdit
+          ...(canEdit || canDelete
             ? [
                 {
                   title: "Amallar",
                   key: "actions",
-                  render: (_: unknown, record: FacultyOut) => (
-                    <Space>
-                      <Button
-                        size="small"
-                        onClick={() => {
+                  render: (_: unknown, record: FacultyOut) => {
+                    const items: ActionItem[] = [];
+                    if (canEdit) {
+                      items.push({
+                        key: "rename",
+                        label: "Nomini o'zgartirish",
+                        onClick: () => {
                           setRenameTarget(record);
                           renameForm.setFieldsValue({ name: record.name });
-                        }}
-                      >
-                        Nomini o'zgartirish
-                      </Button>
-                    </Space>
-                  ),
+                        },
+                      });
+                    }
+                    if (canDelete) {
+                      items.push({
+                        key: "delete",
+                        label: "O'chirish",
+                        danger: true,
+                        confirmTitle: "O'chirishni tasdiqlaysizmi?",
+                        onClick: () => handleDelete(record),
+                      });
+                    }
+                    return <ActionsMenu items={items} />;
+                  },
                 },
               ]
             : []),

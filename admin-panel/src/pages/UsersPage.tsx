@@ -138,7 +138,7 @@ export function UsersPage() {
   }
 
   useEffect(() => {
-    listFaculties().then(setFaculties);
+    listFaculties(undefined, { topLevel: true }).then(setFaculties);
   }, []);
 
   useEffect(() => {

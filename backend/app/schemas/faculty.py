@@ -6,6 +6,7 @@ from app.models.enums import OrgUnitType
 class FacultyCreate(BaseModel):
     name: str
     unit_type: OrgUnitType = OrgUnitType.FACULTY
+    parent_id: int | None = None
 
 
 class FacultyUpdate(BaseModel):
@@ -18,6 +19,7 @@ class FacultyOut(BaseModel):
     id: int
     name: str
     unit_type: OrgUnitType
+    parent_id: int | None = None
 
 
 class FacultyImportSkip(BaseModel):

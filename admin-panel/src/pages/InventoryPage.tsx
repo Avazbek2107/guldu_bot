@@ -81,7 +81,7 @@ export function InventoryPage() {
     try {
       const [itemList, facultyList, mainTechs, backupTechs] = await Promise.all([
         listInventory(facultyFilter),
-        listFaculties(),
+        listFaculties(undefined, { topLevel: true }),
         listUsers({ role: "technician_main" }),
         listUsers({ role: "technician_backup" }),
       ]);

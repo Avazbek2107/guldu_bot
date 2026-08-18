@@ -32,12 +32,18 @@ def _require_permission(current_user: User, unit_type: OrgUnitType, action: str)
 @router.get("", response_model=list[FacultyOut])
 async def list_faculties(
     unit_type: OrgUnitType | None = None,
+    parent_id: int | None = None,
+    top_level: bool | None = None,
     db: AsyncSession = Depends(get_db),
     _: User = Depends(get_current_user),
 ):
     query = select(Faculty)
     if unit_type is not None:
         query = query.where(Faculty.unit_type == unit_type)
+    if parent_id is not None:
+        query = query.where(Faculty.parent_id == parent_id)
+    if top_level:
+        query = query.where(Faculty.parent_id.is_(None))
     result = await db.execute(query.order_by(Faculty.name))
     return result.scalars().all()
 
@@ -104,7 +110,17 @@ async def create_faculty(
     current_user: User = Depends(get_current_user),
 ):
     _require_permission(current_user, payload.unit_type, "create")
-    faculty = Faculty(name=payload.name, unit_type=payload.unit_type)
+
+    parent: Faculty | None = None
+    if payload.parent_id is not None:
+        parent = await db.get(Faculty, payload.parent_id)
+        if parent is None or parent.unit_type != OrgUnitType.FACULTY:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Kafedra faqat fakultetga biriktirilishi mumkin",
+            )
+
+    faculty = Faculty(name=payload.name, unit_type=payload.unit_type, parent_id=payload.parent_id)
     db.add(faculty)
     try:
         await db.commit()
@@ -112,7 +128,7 @@ async def create_faculty(
         await db.rollback()
         raise HTTPException(
             status_code=status.HTTP_409_CONFLICT,
-            detail="Bu nomdagi fakultet/bo'lim allaqachon mavjud",
+            detail="Bu nomdagi fakultet/bo'lim/kafedra allaqachon mavjud",
         ) from exc
     await db.refresh(faculty)
     return faculty
@@ -140,3 +156,25 @@ async def update_faculty(
         ) from exc
     await db.refresh(faculty)
     return faculty
+
+
+@router.delete("/{faculty_id}", status_code=status.HTTP_204_NO_CONTENT)
+async def delete_faculty(
+    faculty_id: int,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    faculty = await db.get(Faculty, faculty_id)
+    if faculty is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Fakultet/bo'lim topilmadi")
+    _require_permission(current_user, faculty.unit_type, "delete")
+    await db.delete(faculty)
+    try:
+        await db.commit()
+    except IntegrityError as exc:
+        await db.rollback()
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="Bunga bog'liq xodimlar, arizalar yoki inventar mavjud, avval ularni boshqa "
+            "fakultet/kafedraga ko'chiring",
+        ) from exc
