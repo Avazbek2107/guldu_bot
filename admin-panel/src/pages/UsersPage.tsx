@@ -309,6 +309,16 @@ export function UsersPage() {
             ),
           },
           {
+            title: "So'nggi kirish",
+            dataIndex: "last_login_at",
+            render: (v: string | null) => (v ? new Date(v).toLocaleString("uz-UZ") : "-"),
+          },
+          {
+            title: "Botda so'nggi faollik",
+            dataIndex: "last_bot_activity_at",
+            render: (v: string | null) => (v ? new Date(v).toLocaleString("uz-UZ") : "-"),
+          },
+          {
             title: "Holat",
             key: "status",
             render: (_: unknown, record: UserOut) => (

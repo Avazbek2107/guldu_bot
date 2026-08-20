@@ -103,6 +103,7 @@ async def login(payload: LoginRequest, response: Response, db: AsyncSession = De
 
     user.failed_login_attempts = 0
     user.locked_until = None
+    user.last_login_at = now
     await db.commit()
 
     issued = create_access_token(user.id, user.role.value)

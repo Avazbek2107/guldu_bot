@@ -112,6 +112,8 @@ export interface UserOut {
   telegram_id: number | null;
   is_blocked: boolean;
   is_suspicious: boolean;
+  last_login_at: string | null;
+  last_bot_activity_at: string | null;
 }
 
 export type OrgUnitType = "faculty" | "department";

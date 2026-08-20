@@ -15,6 +15,7 @@ from app.core.database import async_session_factory
 
 from bot.config import settings
 from bot.handlers import registration, technician, tickets
+from bot.middlewares.activity import ActivityTrackingMiddleware
 from bot.services.escalation import run_escalation_loop
 
 logging.basicConfig(level=logging.INFO)
@@ -23,6 +24,7 @@ logging.basicConfig(level=logging.INFO)
 async def main() -> None:
     bot = Bot(token=settings.bot_token, default=DefaultBotProperties(parse_mode=ParseMode.HTML))
     dp = Dispatcher(storage=MemoryStorage())
+    dp.update.outer_middleware(ActivityTrackingMiddleware())
 
     dp.include_router(registration.router)
     dp.include_router(tickets.router)

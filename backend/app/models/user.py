@@ -35,6 +35,9 @@ class User(Base, TimestampMixin):
     failed_login_attempts: Mapped[int] = mapped_column(Integer, default=0, server_default="0", nullable=False)
     locked_until: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
 
+    last_login_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    last_bot_activity_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+
     faculty: Mapped["Faculty"] = relationship(back_populates="users")
     faculty_assignments: Mapped[list["TechnicianFacultyAssignment"]] = relationship(
         back_populates="user", cascade="all, delete-orphan"

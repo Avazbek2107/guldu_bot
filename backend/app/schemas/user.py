@@ -1,3 +1,4 @@
+from datetime import datetime
 from typing import TYPE_CHECKING
 
 from pydantic import BaseModel, ConfigDict, Field, model_validator
@@ -125,6 +126,8 @@ class UserOut(BaseModel):
     telegram_id: int | None
     is_blocked: bool
     is_suspicious: bool
+    last_login_at: datetime | None = None
+    last_bot_activity_at: datetime | None = None
 
 
 def serialize_user(user: "User", visible_faculty_ids: set[int] | None = None) -> UserOut:
@@ -153,4 +156,6 @@ def serialize_user(user: "User", visible_faculty_ids: set[int] | None = None) ->
         telegram_id=user.telegram_id,
         is_blocked=user.is_blocked,
         is_suspicious=user.is_suspicious,
+        last_login_at=user.last_login_at,
+        last_bot_activity_at=user.last_bot_activity_at,
     )

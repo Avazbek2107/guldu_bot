@@ -136,6 +136,11 @@ export function EndUsersPage() {
             ),
           },
           {
+            title: "Botda so'nggi faollik",
+            dataIndex: "last_bot_activity_at",
+            render: (v: string | null) => (v ? new Date(v).toLocaleString("uz-UZ") : "-"),
+          },
+          {
             title: "Holat",
             key: "status",
             render: (_: unknown, record: UserOut) => (
