@@ -7,7 +7,7 @@ from openpyxl.styles import Font
 from openpyxl.utils import get_column_letter
 from openpyxl.worksheet.datavalidation import DataValidation
 
-from app.schemas.inventory import INVENTORY_STATUS_OPTIONS, INVENTORY_TYPE_OPTIONS
+from app.schemas.inventory import INVENTORY_INTERNET_OPTIONS, INVENTORY_STATUS_OPTIONS, INVENTORY_TYPE_OPTIONS
 from app.schemas.inventory import InventoryItemOut
 from app.services.excel_safety import safe_row
 
@@ -69,6 +69,12 @@ def generate_inventory_xlsx(items: Sequence[InventoryItemOut], location_options:
     )
     ws.add_data_validation(status_validation)
     status_validation.add(f"H2:H{max_row}")
+
+    internet_validation = DataValidation(
+        type="list", formula1=f'"{",".join(INVENTORY_INTERNET_OPTIONS)}"', allow_blank=True
+    )
+    ws.add_data_validation(internet_validation)
+    internet_validation.add(f"I2:I{max_row}")
 
     if location_options:
         lookup_ws = wb.create_sheet(LOCATION_SHEET_NAME)

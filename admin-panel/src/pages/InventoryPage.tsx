@@ -38,6 +38,12 @@ const STATUS_OPTIONS = [
   { value: "Yaroqsiz", label: "Yaroqsiz" },
 ];
 
+const INTERNET_OPTIONS = [
+  { value: "Mavjud", label: "Mavjud" },
+  { value: "Mavjud emas", label: "Mavjud emas" },
+  { value: "Nosoz", label: "Nosoz" },
+];
+
 const STATUS_COLORS: Record<string, string> = {
   Ishchi: "green",
   "Ta'mir talab": "orange",
@@ -419,7 +425,7 @@ export function InventoryPage() {
             <Select options={STATUS_OPTIONS} />
           </Form.Item>
           <Form.Item name="internet_connection" label="Internetga ulanganligi">
-            <Input placeholder="Masalan: internetga ulangan (kabeli bor)" />
+            <Select allowClear options={INTERNET_OPTIONS} />
           </Form.Item>
           {createInventoryType && MAC_ADDRESS_TYPES.has(createInventoryType) && (
             <Form.Item name="mac_address" label="MAC manzili">
@@ -482,7 +488,7 @@ export function InventoryPage() {
             <Select options={STATUS_OPTIONS} />
           </Form.Item>
           <Form.Item name="internet_connection" label="Internetga ulanganligi">
-            <Input />
+            <Select allowClear options={INTERNET_OPTIONS} />
           </Form.Item>
           {editInventoryType && MAC_ADDRESS_TYPES.has(editInventoryType) && (
             <Form.Item name="mac_address" label="MAC manzili">
