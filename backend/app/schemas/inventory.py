@@ -21,7 +21,11 @@ INVENTORY_TYPE_OPTIONS: list[str] = [
 
 INVENTORY_STATUS_OPTIONS: list[str] = ["Ishchi", "Ta'mir talab", "Yaroqsiz"]
 
-INVENTORY_INTERNET_OPTIONS: list[str] = ["Mavjud", "Mavjud emas", "Nosoz"]
+INVENTORY_INTERNET_OPTIONS: list[str] = [
+    "Internetga ulangan (kabeli bor)",
+    "Internetga ulanmagan (kabeli yo'q)",
+    "Wifi",
+]
 
 MAC_ADDRESS_INVENTORY_TYPES: set[str] = {"Monoblok", "Kompyuter", "Noutbook", "Interaktiv panel"}
 

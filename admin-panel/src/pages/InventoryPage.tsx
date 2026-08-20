@@ -39,9 +39,9 @@ const STATUS_OPTIONS = [
 ];
 
 const INTERNET_OPTIONS = [
-  { value: "Mavjud", label: "Mavjud" },
-  { value: "Mavjud emas", label: "Mavjud emas" },
-  { value: "Nosoz", label: "Nosoz" },
+  { value: "Internetga ulangan (kabeli bor)", label: "Internetga ulangan (kabeli bor)" },
+  { value: "Internetga ulanmagan (kabeli yo'q)", label: "Internetga ulanmagan (kabeli yo'q)" },
+  { value: "Wifi", label: "Wifi" },
 ];
 
 const STATUS_COLORS: Record<string, string> = {
