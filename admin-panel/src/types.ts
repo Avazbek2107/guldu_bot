@@ -60,6 +60,9 @@ export const INVENTORY_TYPES: string[] = [
   "Televizor",
   "Kamera",
   "NVR",
+  "Switch",
+  "PoE Switch",
+  "HUB",
 ];
 
 export const ROLE_LABELS_UZ: Record<UserRole, string> = {

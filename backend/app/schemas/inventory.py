@@ -17,6 +17,9 @@ INVENTORY_TYPE_OPTIONS: list[str] = [
     "Televizor",
     "Kamera",
     "NVR",
+    "Switch",
+    "PoE Switch",
+    "HUB",
 ]
 
 INVENTORY_STATUS_OPTIONS: list[str] = ["Ishchi", "Ta'mir talab", "Yaroqsiz"]
