@@ -52,3 +52,7 @@ export async function downloadTicketPdf(ticketId: number, filename: string): Pro
 export function resolveAssetUrl(path: string): string {
   return `${API_BASE_URL}${path}`;
 }
+
+export function extractErrorDetail(err: unknown): string | undefined {
+  return (err as { response?: { data?: { detail?: string } } })?.response?.data?.detail;
+}

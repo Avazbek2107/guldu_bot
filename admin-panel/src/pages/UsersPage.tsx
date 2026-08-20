@@ -13,6 +13,7 @@ import {
   type FacultyAssignmentInput,
 } from "../api/users";
 import { listFaculties } from "../api/faculties";
+import { extractErrorDetail } from "../api/client";
 import { useAuth } from "../auth/AuthContext";
 import { hasPermission } from "../auth/permissions";
 import {
@@ -172,8 +173,8 @@ export function UsersPage() {
       setCreateOpen(false);
       createForm.resetFields();
       loadUsers();
-    } catch {
-      message.error("Xatolik: username band yoki fakultetda asosiy texnik xodim allaqachon bor");
+    } catch (err) {
+      message.error(extractErrorDetail(err) ?? "Xatolik yuz berdi");
     } finally {
       setSaving(false);
     }
@@ -194,8 +195,8 @@ export function UsersPage() {
       message.success("Saqlandi");
       setEditTarget(null);
       loadUsers();
-    } catch {
-      message.error("Xatolik yuz berdi");
+    } catch (err) {
+      message.error(extractErrorDetail(err) ?? "Xatolik yuz berdi");
     } finally {
       setSaving(false);
     }

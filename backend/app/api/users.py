@@ -31,6 +31,21 @@ TECHNICIAN_ROLES = (UserRole.TECHNICIAN_MAIN, UserRole.TECHNICIAN_BACKUP)
 _assignments_loader = selectinload(User.faculty_assignments).selectinload(TechnicianFacultyAssignment.faculty)
 _inventory_type_loader = selectinload(User.inventory_type_assignments)
 
+_CONSTRAINT_MESSAGES = {
+    "users_username_key": "Bu login allaqachon band",
+    "users_telegram_id_key": "Bu Telegram ID allaqachon boshqa foydalanuvchiga bog'langan",
+    "ix_one_main_tech_per_faculty_assignment": "Bu fakultet/bo'limda allaqachon asosiy texnik xodim bor",
+}
+
+
+def _integrity_error_detail(exc: IntegrityError, fallback: str) -> str:
+    """IntegrityError's own message is a generic catch-all — dig out the actual
+    constraint asyncpg rejected so the admin sees *which* field conflicted
+    (username vs Telegram ID vs main-technician-per-faculty) instead of
+    guessing from a combined message."""
+    constraint_name = getattr(getattr(exc.orig, "__cause__", None), "constraint_name", None)
+    return _CONSTRAINT_MESSAGES.get(constraint_name, fallback)
+
 
 async def _backfill_inventory_technician(db: AsyncSession, faculty_id: int, technician_id: int) -> None:
     """When someone becomes the MAIN technician for a faculty/bo'lim, any
@@ -243,7 +258,9 @@ async def create_user(
         await db.rollback()
         raise HTTPException(
             status_code=status.HTTP_409_CONFLICT,
-            detail="Bu username, Telegram ID band yoki fakultetda allaqachon asosiy texnik xodim bor",
+            detail=_integrity_error_detail(
+                exc, "Bu username, Telegram ID band yoki fakultetda allaqachon asosiy texnik xodim bor"
+            ),
         ) from exc
 
     created = await _load_user(db, user.id)
@@ -299,7 +316,7 @@ async def update_user(
         await db.rollback()
         raise HTTPException(
             status_code=status.HTTP_409_CONFLICT,
-            detail="Bu Telegram ID allaqachon boshqa foydalanuvchiga bog'langan",
+            detail=_integrity_error_detail(exc, "Bu Telegram ID allaqachon boshqa foydalanuvchiga bog'langan"),
         ) from exc
 
     db.expire_all()
