@@ -18,7 +18,7 @@ _CODE_LENGTH = 5
 _EXPIRE_MINUTES = 5
 _WIDTH, _HEIGHT = 140, 50
 _BACKGROUND = "#eef7ef"
-_INK = "#2c2c2c"
+_COLORS = ["#2a78d6", "#22a35e", "#c2412d", "#7e14ff", "#c98a12", "#1f9c9c"]
 
 # Each captcha token is meant to authorize exactly one /auth/login attempt.
 # Since verification is a stateless signed token (works across process
@@ -44,6 +44,18 @@ def _render_svg(code: str) -> str:
     rng = random.Random(secrets.randbits(64))
     seed = rng.randint(1, 999)
     display = code.lower()
+
+    char_width = _WIDTH / (len(display) + 1)
+    chars_svg = []
+    for i, ch in enumerate(display):
+        x = char_width * (i + 0.8)
+        color = rng.choice(_COLORS)
+        chars_svg.append(
+            f'<text x="{x:.1f}" y="{_HEIGHT / 2 + 8}" font-size="26" '
+            'font-family="\'Comic Sans MS\', \'Trebuchet MS\', sans-serif" font-weight="700" '
+            f'fill="{color}" text-anchor="middle">{ch}</text>'
+        )
+
     svg = (
         f'<svg xmlns="http://www.w3.org/2000/svg" width="{_WIDTH}" height="{_HEIGHT}" '
         f'viewBox="0 0 {_WIDTH} {_HEIGHT}">'
@@ -52,11 +64,7 @@ def _render_svg(code: str) -> str:
         '<feDisplacementMap in="SourceGraphic" in2="turb" scale="6"/>'
         "</filter></defs>"
         f'<rect width="{_WIDTH}" height="{_HEIGHT}" fill="{_BACKGROUND}"/>'
-        '<g filter="url(#warp)">'
-        f'<text x="{_WIDTH / 2}" y="{_HEIGHT / 2 + 8}" font-size="26" '
-        'font-family="\'Comic Sans MS\', \'Trebuchet MS\', sans-serif" font-weight="700" '
-        f'fill="{_INK}" text-anchor="middle" letter-spacing="2">{display}</text>'
-        "</g></svg>"
+        '<g filter="url(#warp)">' + "".join(chars_svg) + "</g></svg>"
     )
     return svg
 
