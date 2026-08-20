@@ -273,6 +273,18 @@ export interface InventoryFacultyStat {
   unusable: number;
 }
 
+export interface TechnicianInventoryTypeCount {
+  inventory_type: string;
+  count: number;
+}
+
+export interface TechnicianInventoryStat {
+  technician_id: number;
+  technician_name: string;
+  total: number;
+  by_type: TechnicianInventoryTypeCount[];
+}
+
 export interface MyDashboardStats {
   my_stat: TechnicianStat;
   faculty_stats: FacultyStat[];
@@ -296,4 +308,5 @@ export interface DashboardStats {
   inventory_status_stats: InventoryStatusStat[];
   inventory_type_stats: InventoryTypeStat[];
   inventory_faculty_stats: InventoryFacultyStat[];
+  technician_inventory_stats: TechnicianInventoryStat[];
 }

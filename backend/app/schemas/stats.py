@@ -50,6 +50,8 @@ class InventoryStatusStat(BaseModel):
 
 
 class InventoryTypeStat(BaseModel):
+    faculty_id: int
+    faculty_name: str
     inventory_type: str
     count: int
 
@@ -57,10 +59,29 @@ class InventoryTypeStat(BaseModel):
 class InventoryFacultyStat(BaseModel):
     faculty_id: int
     faculty_name: str
+    parent_id: int | None = None
     total: int
     working: int
     needs_repair: int
     unusable: int
+
+
+class TechnicianInventoryTypeCount(BaseModel):
+    inventory_type: str
+    count: int
+
+
+class TechnicianInventoryStat(BaseModel):
+    technician_id: int
+    technician_name: str
+    total: int
+    by_type: list[TechnicianInventoryTypeCount]
+
+
+class MyDashboardStats(BaseModel):
+    my_stat: TechnicianStat
+    faculty_stats: list[FacultyStat]
+    inventory_faculty_stats: list[InventoryFacultyStat]
 
 
 class DashboardStats(BaseModel):
@@ -80,3 +101,4 @@ class DashboardStats(BaseModel):
     inventory_status_stats: list[InventoryStatusStat]
     inventory_type_stats: list[InventoryTypeStat]
     inventory_faculty_stats: list[InventoryFacultyStat]
+    technician_inventory_stats: list[TechnicianInventoryStat]

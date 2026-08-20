@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import type { ReactNode } from "react";
 import { useNavigate } from "react-router-dom";
-import { Card, Col, Row, Statistic, Spin, Table, Tag } from "antd";
+import { Card, Col, Row, Select, Statistic, Spin, Table, Tag } from "antd";
 import {
   CheckCircleOutlined,
   ExclamationCircleOutlined,
@@ -26,10 +26,22 @@ import {
   XAxis,
   YAxis,
 } from "recharts";
-import { fetchDashboardStats } from "../api/stats";
+import { fetchDashboardStats, fetchMyDashboardStats } from "../api/stats";
 import { CARD_STYLE } from "../theme";
-import type { DashboardStats } from "../types";
+import { useAuth } from "../auth/AuthContext";
+import type { DashboardStats, InventoryFacultyStat, MyDashboardStats } from "../types";
 import { CATEGORY_LABELS_UZ } from "../types";
+
+interface InventoryStatRow extends InventoryFacultyStat {
+  children?: InventoryStatRow[];
+}
+
+interface TechnicianInventoryRow {
+  key: string;
+  name: string;
+  total: number | null;
+  children?: TechnicianInventoryRow[];
+}
 
 // Validated categorical slots (dataviz skill palette) — fixed order, never cycled.
 const BLUE = "#2a78d6"; // chart accent (trend/category bars)
@@ -135,16 +147,211 @@ function ChartTooltip({
   );
 }
 
-export function DashboardPage() {
+function TechnicianDashboard() {
   const navigate = useNavigate();
-  const [stats, setStats] = useState<DashboardStats | null>(null);
+  const [stats, setStats] = useState<MyDashboardStats | null>(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    fetchDashboardStats()
+    fetchMyDashboardStats()
       .then(setStats)
       .finally(() => setLoading(false));
   }, []);
+
+  if (loading || !stats) {
+    return (
+      <div style={{ display: "flex", justifyContent: "center", padding: 48 }}>
+        <Spin size="large" />
+      </div>
+    );
+  }
+
+  const { my_stat: myStat, faculty_stats: facultyStats, inventory_faculty_stats: inventoryFacultyStats } = stats;
+
+  return (
+    <div>
+      <Row gutter={[16, 16]}>
+        <Col flex="1 1 180px">
+          <Card
+            hoverable
+            onClick={() => navigate("/tickets")}
+            style={{ ...CARD_STYLE, background: BLUE, border: "none" }}
+          >
+            <div style={{ display: "flex", alignItems: "center", gap: 14 }}>
+              <KpiIcon
+                icon={<FileTextOutlined style={{ fontSize: 20, color: "#fff" }} />}
+                tint="rgba(255,255,255,0.18)"
+              />
+              <div>
+                <div style={{ fontSize: 13, color: "rgba(255,255,255,0.85)" }}>Qabul qilingan</div>
+                <div style={{ fontSize: 26, fontWeight: 700, color: "#fff", lineHeight: 1.2 }}>
+                  {myStat.accepted}
+                </div>
+              </div>
+            </div>
+          </Card>
+        </Col>
+        <Col flex="1 1 180px">
+          <Card
+            hoverable
+            onClick={() => navigate("/tickets?status=in_progress")}
+            style={{ ...CARD_STYLE, background: YELLOW, border: "none" }}
+          >
+            <div style={{ display: "flex", alignItems: "center", gap: 14 }}>
+              <KpiIcon
+                icon={<SyncOutlined style={{ fontSize: 20, color: INK_PRIMARY }} />}
+                tint="rgba(11,11,11,0.10)"
+              />
+              <div>
+                <div style={{ fontSize: 13, color: "rgba(11,11,11,0.65)" }}>Ochiq qolgan</div>
+                <div style={{ fontSize: 26, fontWeight: 700, color: INK_PRIMARY, lineHeight: 1.2 }}>
+                  {myStat.open_remaining}
+                </div>
+              </div>
+            </div>
+          </Card>
+        </Col>
+        <Col flex="1 1 180px">
+          <Card
+            hoverable
+            onClick={() => navigate("/tickets?status=closed")}
+            style={{ ...CARD_STYLE, background: GREEN, border: "none" }}
+          >
+            <div style={{ display: "flex", alignItems: "center", gap: 14 }}>
+              <KpiIcon
+                icon={<CheckCircleOutlined style={{ fontSize: 20, color: "#fff" }} />}
+                tint="rgba(255,255,255,0.18)"
+              />
+              <div>
+                <div style={{ fontSize: 13, color: "rgba(255,255,255,0.85)" }}>Yopilgan</div>
+                <div style={{ fontSize: 26, fontWeight: 700, color: "#fff", lineHeight: 1.2 }}>{myStat.closed}</div>
+              </div>
+            </div>
+          </Card>
+        </Col>
+      </Row>
+
+      <Row gutter={[16, 16]} style={{ marginTop: 16 }}>
+        <Col xs={24} sm={12}>
+          <Card style={CARD_STYLE}>
+            <Statistic
+              title="Samaradorlik"
+              value={myStat.efficiency_percent ?? undefined}
+              precision={0}
+              suffix="%"
+              valueStyle={{
+                color:
+                  myStat.efficiency_percent == null
+                    ? undefined
+                    : myStat.efficiency_percent <= 50
+                      ? RED
+                      : myStat.efficiency_percent <= 75
+                        ? YELLOW
+                        : GREEN,
+              }}
+            />
+          </Card>
+        </Col>
+        <Col xs={24} sm={12}>
+          <Card style={CARD_STYLE}>
+            <Statistic
+              title="O'rtacha yopish vaqti"
+              value={myStat.avg_close_hours ?? undefined}
+              precision={1}
+              suffix="soat"
+            />
+          </Card>
+        </Col>
+      </Row>
+
+      <Row gutter={[16, 16]} style={{ marginTop: 16 }}>
+        <Col span={24}>
+          <Card title="Fakultet/bo'limlarim bo'yicha statistika" style={CARD_STYLE}>
+            <Table
+              size="small"
+              rowKey="faculty_id"
+              pagination={false}
+              scroll={{ x: "max-content" }}
+              dataSource={facultyStats}
+              columns={[
+                { title: "Fakultet/bo'lim", dataIndex: "faculty_name" },
+                { title: "Jami", dataIndex: "total" },
+                {
+                  title: "Ochiq",
+                  dataIndex: "open",
+                  render: (v: number) => <CountTag value={v} color={RED} />,
+                },
+                {
+                  title: "Jarayonda",
+                  dataIndex: "in_progress",
+                  render: (v: number) => <CountTag value={v} color={YELLOW} />,
+                },
+                {
+                  title: "Yopilgan",
+                  dataIndex: "closed",
+                  render: (v: number) => <CountTag value={v} color={GREEN} />,
+                },
+              ]}
+            />
+          </Card>
+        </Col>
+      </Row>
+
+      <Row gutter={[16, 16]} style={{ marginTop: 16 }}>
+        <Col span={24}>
+          <Card title="Inventar holati — mening yo'nalishlarim" style={CARD_STYLE}>
+            <Table
+              size="small"
+              rowKey="faculty_id"
+              pagination={false}
+              scroll={{ x: "max-content" }}
+              dataSource={inventoryFacultyStats}
+              columns={[
+                { title: "Yo'nalish", dataIndex: "faculty_name" },
+                { title: "Jami", dataIndex: "total" },
+                {
+                  title: "Ishchi",
+                  dataIndex: "working",
+                  render: (v: number) => <CountTag value={v} color={GREEN} />,
+                },
+                {
+                  title: "Ta'mir talab",
+                  dataIndex: "needs_repair",
+                  render: (v: number) => <CountTag value={v} color={YELLOW} />,
+                },
+                {
+                  title: "Yaroqsiz",
+                  dataIndex: "unusable",
+                  render: (v: number) => <CountTag value={v} color={RED} />,
+                },
+              ]}
+            />
+          </Card>
+        </Col>
+      </Row>
+    </div>
+  );
+}
+
+export function DashboardPage() {
+  const navigate = useNavigate();
+  const { user } = useAuth();
+  const [stats, setStats] = useState<DashboardStats | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [inventoryTypeUnit, setInventoryTypeUnit] = useState<number | undefined>(undefined);
+  const isTechnician = user?.role === "technician_main" || user?.role === "technician_backup";
+
+  useEffect(() => {
+    if (isTechnician) return;
+    fetchDashboardStats()
+      .then(setStats)
+      .finally(() => setLoading(false));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isTechnician]);
+
+  if (isTechnician) {
+    return <TechnicianDashboard />;
+  }
 
   if (loading || !stats) {
     return (
@@ -181,9 +388,39 @@ export function DashboardPage() {
     name: s.status,
     value: s.count,
   }));
-  const inventoryTypeData = stats.inventory_type_stats
-    .map((t) => ({ name: t.inventory_type, count: t.count }))
-    .sort((a, b) => b.count - a.count);
+  // "Barchasi" (no unit picked) sums every faculty/bo'lim's counts per type;
+  // picking one filters the cross-tab down to just that unit's rows.
+  const inventoryTypeUnitOptions = stats.inventory_faculty_stats
+    .filter((f) => f.parent_id == null)
+    .map((f) => ({ value: f.faculty_id, label: f.faculty_name }));
+  const inventoryTypeData = (
+    inventoryTypeUnit == null
+      ? Object.entries(
+          stats.inventory_type_stats.reduce<Record<string, number>>((acc, t) => {
+            acc[t.inventory_type] = (acc[t.inventory_type] ?? 0) + t.count;
+            return acc;
+          }, {}),
+        ).map(([name, count]) => ({ name, count }))
+      : stats.inventory_type_stats
+          .filter((t) => t.faculty_id === inventoryTypeUnit)
+          .map((t) => ({ name: t.inventory_type, count: t.count }))
+  ).sort((a, b) => b.count - a.count);
+  const inventoryFacultyTree: InventoryStatRow[] = stats.inventory_faculty_stats
+    .filter((f) => f.parent_id == null)
+    .map((f) => {
+      const children = stats.inventory_faculty_stats.filter((k) => k.parent_id === f.faculty_id);
+      return children.length > 0 ? { ...f, children } : { ...f };
+    });
+  const technicianInventoryTree: TechnicianInventoryRow[] = stats.technician_inventory_stats.map((t) => ({
+    key: `tech-${t.technician_id}`,
+    name: t.technician_name,
+    total: t.total,
+    children: t.by_type.map((b) => ({
+      key: `tech-${t.technician_id}-${b.inventory_type}`,
+      name: b.inventory_type,
+      total: b.count,
+    })),
+  }));
   const totalInventoryStatusCount = inventoryStatusData.reduce((sum, d) => sum + d.value, 0);
   function inventoryLegendFormatter(value: string) {
     const item = inventoryStatusData.find((d) => d.name === value);
@@ -585,7 +822,7 @@ export function DashboardPage() {
               rowKey="faculty_id"
               pagination={false}
               scroll={{ x: "max-content", y: 260 }}
-              dataSource={stats.inventory_faculty_stats}
+              dataSource={inventoryFacultyTree}
               columns={[
                 { title: "Yo'nalish", dataIndex: "faculty_name" },
                 { title: "Jami", dataIndex: "total", defaultSortOrder: "descend", sorter: (a: { total: number }, b: { total: number }) => a.total - b.total },
@@ -612,7 +849,24 @@ export function DashboardPage() {
 
       <Row gutter={[16, 16]} style={{ marginTop: 16 }}>
         <Col span={24}>
-          <Card title="Inventar toifasi bo'yicha statistika" style={CARD_STYLE}>
+          <Card
+            title="Inventar toifasi bo'yicha statistika"
+            style={CARD_STYLE}
+            extra={
+              <Select
+                allowClear
+                placeholder="Barcha fakultet/bo'limlar"
+                style={{ width: 240 }}
+                value={inventoryTypeUnit}
+                onChange={setInventoryTypeUnit}
+                options={inventoryTypeUnitOptions}
+                showSearch
+                filterOption={(input, option) =>
+                  (option?.label as string | undefined)?.toLowerCase().includes(input.toLowerCase()) ?? false
+                }
+              />
+            }
+          >
             <ResponsiveContainer width="100%" height={Math.max(260, inventoryTypeData.length * 32)}>
               <BarChart data={inventoryTypeData} layout="vertical" margin={{ left: 8, right: 24 }}>
                 <CartesianGrid horizontal={false} stroke={GRIDLINE} />
@@ -631,6 +885,30 @@ export function DashboardPage() {
                 </Bar>
               </BarChart>
             </ResponsiveContainer>
+          </Card>
+        </Col>
+      </Row>
+
+      <Row gutter={[16, 16]} style={{ marginTop: 16 }}>
+        <Col span={24}>
+          <Card title="Xodimlar bo'yicha inventar statistikasi" style={CARD_STYLE}>
+            <Table
+              size="small"
+              rowKey="key"
+              pagination={false}
+              scroll={{ x: "max-content", y: 320 }}
+              dataSource={technicianInventoryTree}
+              columns={[
+                { title: "Xodim / Toifa", dataIndex: "name" },
+                {
+                  title: "Jami inventar",
+                  dataIndex: "total",
+                  defaultSortOrder: "descend",
+                  sorter: (a: TechnicianInventoryRow, b: TechnicianInventoryRow) => (a.total ?? 0) - (b.total ?? 0),
+                  render: (v: number) => <CountTag value={v} color={BLUE} />,
+                },
+              ]}
+            />
           </Card>
         </Col>
       </Row>
