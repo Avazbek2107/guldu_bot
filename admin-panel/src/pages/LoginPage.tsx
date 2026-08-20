@@ -1,12 +1,14 @@
-import { useState } from "react";
-import { Button, Card, Form, Input, Typography, message } from "antd";
-import { LockOutlined, UserOutlined } from "@ant-design/icons";
+import { useEffect, useState } from "react";
+import { Button, Card, Form, Input, Space, Typography, message } from "antd";
+import { LockOutlined, ReloadOutlined, UserOutlined } from "@ant-design/icons";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "../auth/AuthContext";
+import { getCaptcha, type CaptchaResponse } from "../api/auth";
 
 interface LoginFormValues {
   username: string;
   password: string;
+  captcha_answer: string;
 }
 
 function Logo() {
@@ -48,15 +50,38 @@ function Logo() {
 export function LoginPage() {
   const { login } = useAuth();
   const navigate = useNavigate();
+  const [form] = Form.useForm<LoginFormValues>();
   const [loading, setLoading] = useState(false);
+  const [captcha, setCaptcha] = useState<CaptchaResponse | null>(null);
+  const [captchaLoading, setCaptchaLoading] = useState(false);
+
+  async function refreshCaptcha() {
+    setCaptchaLoading(true);
+    try {
+      setCaptcha(await getCaptcha());
+    } catch {
+      message.error("Rasmdagi kodni yuklab bo'lmadi");
+    } finally {
+      setCaptchaLoading(false);
+    }
+  }
+
+  useEffect(() => {
+    refreshCaptcha();
+  }, []);
 
   async function handleFinish(values: LoginFormValues) {
+    if (!captcha) return;
     setLoading(true);
     try {
-      await login(values.username, values.password);
+      await login(values.username, values.password, captcha.captcha_token, values.captcha_answer);
       navigate("/", { replace: true });
-    } catch {
-      message.error("Login yoki parol noto'g'ri");
+    } catch (err) {
+      const detail =
+        (err as { response?: { data?: { detail?: string } } })?.response?.data?.detail;
+      message.error(detail ?? "Login yoki parol noto'g'ri");
+      form.setFieldValue("captcha_answer", "");
+      refreshCaptcha();
     } finally {
       setLoading(false);
     }
@@ -93,15 +118,58 @@ export function LoginPage() {
         >
           Guliston davlat universiteti
         </Typography.Text>
-        <Form layout="vertical" onFinish={handleFinish} requiredMark={false}>
+        <Form form={form} layout="vertical" onFinish={handleFinish} requiredMark={false}>
           <Form.Item name="username" label="Login" rules={[{ required: true, message: "Login kiriting" }]}>
             <Input size="large" prefix={<UserOutlined style={{ color: "rgba(0,0,0,0.35)" }} />} autoFocus />
           </Form.Item>
           <Form.Item name="password" label="Parol" rules={[{ required: true, message: "Parol kiriting" }]}>
             <Input.Password size="large" prefix={<LockOutlined style={{ color: "rgba(0,0,0,0.35)" }} />} />
           </Form.Item>
+          <Form.Item label="Tekshiruv kodi">
+            <Space.Compact block>
+              {captcha ? (
+                <img
+                  src={captcha.image}
+                  alt="Captcha"
+                  style={{ height: 40, width: 112, borderRadius: "8px 0 0 8px", border: "1px solid #d9d9d9", borderRight: "none" }}
+                />
+              ) : (
+                <div
+                  style={{
+                    height: 40,
+                    width: 112,
+                    borderRadius: "8px 0 0 8px",
+                    background: "#f5f6fa",
+                    border: "1px solid #d9d9d9",
+                    borderRight: "none",
+                  }}
+                />
+              )}
+              <Form.Item name="captcha_answer" noStyle rules={[{ required: true, message: "Tekshiruv kodini kiriting" }]}>
+                <Input size="large" placeholder="Tekshiruv kodini kiriting" autoComplete="off" />
+              </Form.Item>
+            </Space.Compact>
+            <Button
+              type="link"
+              size="small"
+              icon={<ReloadOutlined spin={captchaLoading} />}
+              onClick={refreshCaptcha}
+              disabled={captchaLoading}
+              style={{ paddingLeft: 0 }}
+            >
+              yangilash
+            </Button>
+          </Form.Item>
           <Form.Item style={{ marginTop: 24, marginBottom: 0 }}>
-            <Button type="primary" htmlType="submit" block size="large" loading={loading} style={{ borderRadius: 10 }}>
+            <Button
+              type="primary"
+              htmlType="submit"
+              block
+              size="large"
+              loading={loading}
+              disabled={!captcha}
+              style={{ borderRadius: 10 }}
+            >
               Kirish
             </Button>
           </Form.Item>

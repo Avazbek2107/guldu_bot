@@ -13,8 +13,9 @@ from app.core.database import get_db
 from app.core.security import create_access_token, hash_password, verify_password
 from app.models.technician_faculty_assignment import TechnicianFacultyAssignment
 from app.models.user import User
-from app.schemas.auth import LoginRequest, MeResponse, ProfileUpdateRequest, TokenResponse
+from app.schemas.auth import CaptchaResponse, LoginRequest, MeResponse, ProfileUpdateRequest, TokenResponse
 from app.schemas.user import serialize_user
+from app.services.captcha import create_captcha, verify_and_consume_captcha
 
 _assignments_loader = selectinload(User.faculty_assignments).selectinload(TechnicianFacultyAssignment.faculty)
 
@@ -51,8 +52,20 @@ def _set_auth_cookie(response: Response, token: str) -> None:
     )
 
 
+@router.get("/captcha", response_model=CaptchaResponse)
+async def get_captcha():
+    challenge = create_captcha()
+    return CaptchaResponse(captcha_token=challenge.captcha_token, image=challenge.image)
+
+
 @router.post("/login", response_model=TokenResponse)
 async def login(payload: LoginRequest, response: Response, db: AsyncSession = Depends(get_db)):
+    if not verify_and_consume_captcha(payload.captcha_token, payload.captcha_answer):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Rasmdagi kod noto'g'ri yoki muddati o'tgan",
+        )
+
     result = await db.execute(
         select(User)
         .where(User.username == payload.username)

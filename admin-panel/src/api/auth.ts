@@ -6,8 +6,28 @@ export interface AuthResponse {
   user: UserOut;
 }
 
-export async function login(username: string, password: string): Promise<AuthResponse> {
-  const { data } = await apiClient.post<AuthResponse>("/auth/login", { username, password });
+export interface CaptchaResponse {
+  captcha_token: string;
+  image: string;
+}
+
+export async function getCaptcha(): Promise<CaptchaResponse> {
+  const { data } = await apiClient.get<CaptchaResponse>("/auth/captcha");
+  return data;
+}
+
+export async function login(
+  username: string,
+  password: string,
+  captchaToken: string,
+  captchaAnswer: string,
+): Promise<AuthResponse> {
+  const { data } = await apiClient.post<AuthResponse>("/auth/login", {
+    username,
+    password,
+    captcha_token: captchaToken,
+    captcha_answer: captchaAnswer,
+  });
   return data;
 }
 

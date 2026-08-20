@@ -31,3 +31,16 @@ def create_access_token(user_id: int, role: str) -> IssuedToken:
 
 def decode_access_token(token: str) -> dict:
     return jwt.decode(token, settings.jwt_secret_key, algorithms=[settings.jwt_algorithm])
+
+
+def create_captcha_token(jti: str, code_hash: str, expire_minutes: int) -> str:
+    expire = datetime.now(timezone.utc) + timedelta(minutes=expire_minutes)
+    payload = {"typ": "captcha", "jti": jti, "code_hash": code_hash, "exp": expire}
+    return jwt.encode(payload, settings.jwt_secret_key, algorithm=settings.jwt_algorithm)
+
+
+def decode_captcha_token(token: str) -> dict:
+    payload = jwt.decode(token, settings.jwt_secret_key, algorithms=[settings.jwt_algorithm])
+    if payload.get("typ") != "captcha":
+        raise jwt.InvalidTokenError("Yaroqsiz captcha token")
+    return payload

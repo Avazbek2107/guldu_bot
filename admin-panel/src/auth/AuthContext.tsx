@@ -6,7 +6,7 @@ import type { UserOut } from "../types";
 interface AuthContextValue {
   user: UserOut | null;
   loading: boolean;
-  login: (username: string, password: string) => Promise<void>;
+  login: (username: string, password: string, captchaToken: string, captchaAnswer: string) => Promise<void>;
   logout: () => Promise<void>;
   setUser: (user: UserOut) => void;
 }
@@ -29,8 +29,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       .finally(() => setLoading(false));
   }, []);
 
-  async function login(username: string, password: string) {
-    const response = await loginApi(username, password);
+  async function login(username: string, password: string, captchaToken: string, captchaAnswer: string) {
+    const response = await loginApi(username, password, captchaToken, captchaAnswer);
     csrfState.token = response.csrf_token;
     setUser(response.user);
   }

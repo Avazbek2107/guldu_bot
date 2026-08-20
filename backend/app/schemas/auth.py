@@ -6,6 +6,13 @@ from app.schemas.user import UserOut
 class LoginRequest(BaseModel):
     username: str
     password: str
+    captcha_token: str
+    captcha_answer: str
+
+
+class CaptchaResponse(BaseModel):
+    captcha_token: str
+    image: str
 
 
 class TokenResponse(BaseModel):
