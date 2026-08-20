@@ -1,5 +1,5 @@
 from fastapi import APIRouter, Depends, HTTPException, status
-from sqlalchemy import delete, select, update
+from sqlalchemy import delete, or_, select, update
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
@@ -9,6 +9,7 @@ from app.core.database import get_db
 from app.core.security import hash_password
 from app.models.enums import TechnicianFacultyRole, UserRole
 from app.models.faculty import Faculty
+from app.models.inventory_item import InventoryItem
 from app.models.technician_faculty_assignment import TechnicianFacultyAssignment
 from app.models.user import User
 from app.schemas.user import (
@@ -28,6 +29,21 @@ TECHNICIAN_ROLES = (UserRole.TECHNICIAN_MAIN, UserRole.TECHNICIAN_BACKUP)
 _assignments_loader = selectinload(User.faculty_assignments).selectinload(TechnicianFacultyAssignment.faculty)
 
 
+async def _backfill_inventory_technician(db: AsyncSession, faculty_id: int, technician_id: int) -> None:
+    """When someone becomes the MAIN technician for a faculty/bo'lim, any
+    inventory item there (or under one of its kafedras) that has no
+    technician yet should default to them — otherwise items imported/created
+    before anyone was assigned stay permanently unowned."""
+    scoped_faculty_ids = (
+        await db.execute(select(Faculty.id).where(or_(Faculty.id == faculty_id, Faculty.parent_id == faculty_id)))
+    ).scalars().all()
+    await db.execute(
+        update(InventoryItem)
+        .where(InventoryItem.faculty_id.in_(scoped_faculty_ids), InventoryItem.assigned_technician_id.is_(None))
+        .values(assigned_technician_id=technician_id)
+    )
+
+
 async def _apply_assignments(db: AsyncSession, user: User, assignments: list[FacultyAssignmentIn]) -> None:
     await db.execute(delete(TechnicianFacultyAssignment).where(TechnicianFacultyAssignment.user_id == user.id))
     await db.flush()
@@ -43,6 +59,7 @@ async def _apply_assignments(db: AsyncSession, user: User, assignments: list[Fac
                 )
                 .values(role=TechnicianFacultyRole.TECHNICIAN_BACKUP)
             )
+            await _backfill_inventory_technician(db, assignment.faculty_id, user.id)
         db.add(TechnicianFacultyAssignment(user_id=user.id, faculty_id=assignment.faculty_id, role=assignment.role))
     await db.flush()
 
