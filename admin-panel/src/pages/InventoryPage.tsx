@@ -30,6 +30,7 @@ import { ActionsMenu } from "../components/ActionsMenu";
 import { CARD_STYLE } from "../theme";
 import { useAuth } from "../auth/AuthContext";
 import { hasPermission } from "../auth/permissions";
+import { INVENTORY_TYPES } from "../types";
 import type { FacultyOut, InventoryItemOut, RepairHistoryItem, UserOut } from "../types";
 
 const STATUS_OPTIONS = [
@@ -50,22 +51,7 @@ const STATUS_COLORS: Record<string, string> = {
   Yaroqsiz: "red",
 };
 
-const INVENTORY_TYPE_OPTIONS = [
-  "Monoblok",
-  "Kompyuter",
-  "Noutbook",
-  "Server",
-  "Interaktiv panel",
-  "Wi-Fi",
-  "Printer",
-  "3in1 printer",
-  "Skaner",
-  "Proyektor",
-  "E-minbar",
-  "Televizor",
-  "Kamera",
-  "NVR",
-].map((v) => ({ value: v, label: v }));
+const INVENTORY_TYPE_OPTIONS = INVENTORY_TYPES.map((v) => ({ value: v, label: v }));
 
 const MAC_ADDRESS_TYPES = new Set(["Monoblok", "Kompyuter", "Noutbook", "Interaktiv panel"]);
 

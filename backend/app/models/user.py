@@ -39,6 +39,9 @@ class User(Base, TimestampMixin):
     faculty_assignments: Mapped[list["TechnicianFacultyAssignment"]] = relationship(
         back_populates="user", cascade="all, delete-orphan"
     )
+    inventory_type_assignments: Mapped[list["TechnicianInventoryTypeAssignment"]] = relationship(
+        back_populates="user", cascade="all, delete-orphan"
+    )
     tickets_created: Mapped[list["Ticket"]] = relationship(
         back_populates="created_by", foreign_keys="Ticket.created_by_user_id"
     )

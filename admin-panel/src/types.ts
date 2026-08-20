@@ -45,6 +45,23 @@ export const STATUS_LABELS_UZ: Record<TicketStatus, string> = {
   closed: "Yopilgan",
 };
 
+export const INVENTORY_TYPES: string[] = [
+  "Monoblok",
+  "Kompyuter",
+  "Noutbook",
+  "Server",
+  "Interaktiv panel",
+  "Wi-Fi",
+  "Printer",
+  "3in1 printer",
+  "Skaner",
+  "Proyektor",
+  "E-minbar",
+  "Televizor",
+  "Kamera",
+  "NVR",
+];
+
 export const ROLE_LABELS_UZ: Record<UserRole, string> = {
   super_admin: "Super Admin",
   admin: "Admin",
@@ -86,6 +103,7 @@ export interface UserOut {
   role: UserRole;
   faculty_id: number | null;
   faculty_assignments: FacultyAssignment[];
+  inventory_type_assignments: string[];
   permissions: Partial<Record<PermissionResource, PermissionAction[]>> | null;
   avatar_url: string | null;
   telegram_id: number | null;
@@ -236,6 +254,8 @@ export interface InventoryStatusStat {
 }
 
 export interface InventoryTypeStat {
+  faculty_id: number;
+  faculty_name: string;
   inventory_type: string;
   count: number;
 }
@@ -243,10 +263,17 @@ export interface InventoryTypeStat {
 export interface InventoryFacultyStat {
   faculty_id: number;
   faculty_name: string;
+  parent_id: number | null;
   total: number;
   working: number;
   needs_repair: number;
   unusable: number;
+}
+
+export interface MyDashboardStats {
+  my_stat: TechnicianStat;
+  faculty_stats: FacultyStat[];
+  inventory_faculty_stats: InventoryFacultyStat[];
 }
 
 export interface DashboardStats {

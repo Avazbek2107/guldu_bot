@@ -18,6 +18,7 @@ from app.schemas.user import serialize_user
 from app.services.captcha import create_captcha, verify_and_consume_captcha
 
 _assignments_loader = selectinload(User.faculty_assignments).selectinload(TechnicianFacultyAssignment.faculty)
+_inventory_type_loader = selectinload(User.inventory_type_assignments)
 
 router = APIRouter(prefix="/auth", tags=["auth"])
 
@@ -36,7 +37,9 @@ AVATAR_ALLOWED_TYPES = {"image/jpeg": "jpg", "image/png": "png", "image/webp": "
 
 
 async def _reload_me(db: AsyncSession, user_id: int) -> User:
-    result = await db.execute(select(User).where(User.id == user_id).options(_assignments_loader))
+    result = await db.execute(
+        select(User).where(User.id == user_id).options(_assignments_loader, _inventory_type_loader)
+    )
     return result.scalar_one()
 
 
@@ -69,7 +72,7 @@ async def login(payload: LoginRequest, response: Response, db: AsyncSession = De
     result = await db.execute(
         select(User)
         .where(User.username == payload.username)
-        .options(selectinload(User.faculty_assignments).selectinload(TechnicianFacultyAssignment.faculty))
+        .options(_assignments_loader, _inventory_type_loader)
     )
     user = result.scalar_one_or_none()
 

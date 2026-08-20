@@ -10,6 +10,7 @@ from app.models.enums import TechnicianFacultyRole, TicketStatus, UserRole
 from app.models.faculty import Faculty
 from app.models.inventory_item import InventoryItem
 from app.models.technician_faculty_assignment import TechnicianFacultyAssignment
+from app.models.technician_inventory_type_assignment import TechnicianInventoryTypeAssignment
 from app.models.ticket import Ticket
 from app.models.user import User
 from app.schemas.inventory import (
@@ -60,6 +61,20 @@ async def _lookup_main_technician_id(db: AsyncSession, scope_faculty_id: int) ->
         select(TechnicianFacultyAssignment.user_id).where(
             TechnicianFacultyAssignment.faculty_id == scope_faculty_id,
             TechnicianFacultyAssignment.role == TechnicianFacultyRole.TECHNICIAN_MAIN,
+        )
+    )
+    return result.scalar_one_or_none()
+
+
+async def _lookup_category_technician_id(db: AsyncSession, inventory_type: str | None) -> int | None:
+    """A technician can be the university-wide go-to person for an inventory
+    TYPE (e.g. all Kamera/NVR units), independent of faculty — this takes
+    priority over the faculty's own main technician when auto-assigning."""
+    if not inventory_type:
+        return None
+    result = await db.execute(
+        select(TechnicianInventoryTypeAssignment.user_id).where(
+            TechnicianInventoryTypeAssignment.inventory_type == inventory_type
         )
     )
     return result.scalar_one_or_none()
@@ -252,6 +267,13 @@ async def import_inventory(
     ).all()
     main_technician_by_faculty = {faculty_id: user_id for faculty_id, user_id in main_tech_rows}
 
+    category_tech_rows = (
+        await db.execute(
+            select(TechnicianInventoryTypeAssignment.inventory_type, TechnicianInventoryTypeAssignment.user_id)
+        )
+    ).all()
+    category_technician_by_type = {inv_type: user_id for inv_type, user_id in category_tech_rows}
+
     created = 0
     skipped: list[InventoryImportSkip] = []
     for row in rows:
@@ -276,7 +298,10 @@ async def import_inventory(
                 internet_connection=row.internet_connection,
                 mac_address=row.mac_address,
                 responsible_person=row.responsible_person,
-                assigned_technician_id=main_technician_by_faculty.get(scope_faculty_id),
+                assigned_technician_id=(
+                    category_technician_by_type.get(row.inventory_type)
+                    or main_technician_by_faculty.get(scope_faculty_id)
+                ),
             )
         )
         created += 1
@@ -332,7 +357,9 @@ async def create_inventory_item(
 
     data = payload.model_dump()
     if data.get("assigned_technician_id") is None:
-        data["assigned_technician_id"] = await _lookup_main_technician_id(db, scope_faculty_id)
+        data["assigned_technician_id"] = await _lookup_category_technician_id(
+            db, data.get("inventory_type")
+        ) or await _lookup_main_technician_id(db, scope_faculty_id)
     else:
         await _validate_assigned_technician(db, data["assigned_technician_id"], scope_faculty_id)
 

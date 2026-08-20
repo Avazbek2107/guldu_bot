@@ -11,6 +11,7 @@ from app.models.enums import TechnicianFacultyRole, UserRole
 from app.models.faculty import Faculty
 from app.models.inventory_item import InventoryItem
 from app.models.technician_faculty_assignment import TechnicianFacultyAssignment
+from app.models.technician_inventory_type_assignment import TechnicianInventoryTypeAssignment
 from app.models.user import User
 from app.schemas.user import (
     FacultyAssignmentIn,
@@ -19,6 +20,7 @@ from app.schemas.user import (
     UserUpdate,
     serialize_user,
     validate_faculty_assignments,
+    validate_inventory_type_assignments,
     validate_permissions,
 )
 
@@ -27,6 +29,7 @@ router = APIRouter(prefix="/users", tags=["users"])
 TECHNICIAN_ROLES = (UserRole.TECHNICIAN_MAIN, UserRole.TECHNICIAN_BACKUP)
 
 _assignments_loader = selectinload(User.faculty_assignments).selectinload(TechnicianFacultyAssignment.faculty)
+_inventory_type_loader = selectinload(User.inventory_type_assignments)
 
 
 async def _backfill_inventory_technician(db: AsyncSession, faculty_id: int, technician_id: int) -> None:
@@ -64,8 +67,41 @@ async def _apply_assignments(db: AsyncSession, user: User, assignments: list[Fac
     await db.flush()
 
 
+async def _backfill_inventory_technician_by_type(db: AsyncSession, inventory_type: str, technician_id: int) -> None:
+    """Same idea as _backfill_inventory_technician, but for a technician who's
+    now the go-to person for an inventory TYPE (e.g. all Kamera/NVR units)
+    regardless of which faculty they're in."""
+    await db.execute(
+        update(InventoryItem)
+        .where(InventoryItem.inventory_type == inventory_type, InventoryItem.assigned_technician_id.is_(None))
+        .values(assigned_technician_id=technician_id)
+    )
+
+
+async def _apply_inventory_type_assignments(db: AsyncSession, user: User, inventory_types: list[str]) -> None:
+    await db.execute(
+        delete(TechnicianInventoryTypeAssignment).where(TechnicianInventoryTypeAssignment.user_id == user.id)
+    )
+    await db.flush()
+
+    for inventory_type in inventory_types:
+        # Only one technician per type — reassigning it here takes it away
+        # from whoever had it before (mirrors the "one main tech per
+        # faculty" auto-demote behavior above, just without a backup tier).
+        await db.execute(
+            delete(TechnicianInventoryTypeAssignment).where(
+                TechnicianInventoryTypeAssignment.inventory_type == inventory_type
+            )
+        )
+        db.add(TechnicianInventoryTypeAssignment(user_id=user.id, inventory_type=inventory_type))
+        await _backfill_inventory_technician_by_type(db, inventory_type, user.id)
+    await db.flush()
+
+
 async def _load_user(db: AsyncSession, user_id: int) -> User | None:
-    result = await db.execute(select(User).where(User.id == user_id).options(_assignments_loader))
+    result = await db.execute(
+        select(User).where(User.id == user_id).options(_assignments_loader, _inventory_type_loader)
+    )
     return result.scalar_one_or_none()
 
 
@@ -115,7 +151,7 @@ async def list_users(
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-    query = select(User).options(_assignments_loader)
+    query = select(User).options(_assignments_loader, _inventory_type_loader)
     own_faculty_ids: set[int] | None = None
 
     parsed_roles: list[UserRole] | None = None
@@ -183,6 +219,7 @@ async def create_user(
     try:
         cleaned_permissions = validate_permissions(payload.role, payload.permissions)
         cleaned_permissions = _scoped_permissions(current_user, cleaned_permissions)
+        validate_inventory_type_assignments(payload.role, payload.inventory_type_assignments)
     except ValueError as exc:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc)) from exc
     user = User(
@@ -200,6 +237,7 @@ async def create_user(
         await db.flush()
         if payload.role in TECHNICIAN_ROLES:
             await _apply_assignments(db, user, payload.faculty_assignments)
+            await _apply_inventory_type_assignments(db, user, payload.inventory_type_assignments)
         await db.commit()
     except IntegrityError as exc:
         await db.rollback()
@@ -236,7 +274,9 @@ async def update_user(
         if await db.get(Faculty, payload.faculty_id) is None:
             raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Fakultet/bo'lim topilmadi")
 
-    data = payload.model_dump(exclude_unset=True, exclude={"password", "faculty_assignments", "permissions"})
+    data = payload.model_dump(
+        exclude_unset=True, exclude={"password", "faculty_assignments", "inventory_type_assignments", "permissions"}
+    )
     for field, value in data.items():
         setattr(user, field, value)
     if payload.password is not None:
@@ -246,6 +286,9 @@ async def update_user(
         if payload.faculty_assignments is not None:
             validate_faculty_assignments(user.role, payload.faculty_assignments)
             await _apply_assignments(db, user, payload.faculty_assignments)
+        if payload.inventory_type_assignments is not None:
+            validate_inventory_type_assignments(user.role, payload.inventory_type_assignments)
+            await _apply_inventory_type_assignments(db, user, payload.inventory_type_assignments)
         if payload.permissions is not None:
             user.permissions = _scoped_permissions(current_user, validate_permissions(user.role, payload.permissions))
         await db.commit()

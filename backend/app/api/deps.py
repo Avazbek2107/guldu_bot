@@ -11,6 +11,7 @@ from app.models.technician_faculty_assignment import TechnicianFacultyAssignment
 from app.models.user import User
 
 _assignments_loader = selectinload(User.faculty_assignments).selectinload(TechnicianFacultyAssignment.faculty)
+_inventory_type_loader = selectinload(User.inventory_type_assignments)
 
 
 def technician_faculty_ids(user: User) -> set[int]:
@@ -35,7 +36,9 @@ async def get_current_user(
         raise credentials_exception
     request.state.jwt_payload = payload
 
-    result = await db.execute(select(User).where(User.id == user_id).options(_assignments_loader))
+    result = await db.execute(
+        select(User).where(User.id == user_id).options(_assignments_loader, _inventory_type_loader)
+    )
     user = result.scalar_one_or_none()
     if user is None:
         raise credentials_exception

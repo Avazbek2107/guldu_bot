@@ -17,6 +17,7 @@ import { useAuth } from "../auth/AuthContext";
 import { hasPermission } from "../auth/permissions";
 import {
   filterOptionByPrefix,
+  INVENTORY_TYPES,
   orgUnitLabel,
   ROLE_LABELS_UZ,
   type FacultyOut,
@@ -24,6 +25,8 @@ import {
   type UserOut,
   type UserRole,
 } from "../types";
+
+const INVENTORY_TYPE_OPTIONS = INVENTORY_TYPES.map((v) => ({ value: v, label: v }));
 
 const TECHNICIAN_ROLES: UserRole[] = ["technician_main", "technician_backup"];
 
@@ -42,6 +45,7 @@ interface CreateFormValues {
   username: string;
   password: string;
   faculty_assignments: FacultyAssignmentInput[];
+  inventory_type_assignments: string[];
   telegram_id?: number;
 }
 
@@ -51,6 +55,7 @@ interface EditFormValues {
   password?: string;
   telegram_id?: number;
   faculty_assignments: FacultyAssignmentInput[];
+  inventory_type_assignments: string[];
 }
 
 function FacultyAssignmentsList({ faculties }: { faculties: FacultyOut[] }) {
@@ -160,6 +165,7 @@ export function UsersPage() {
         phone: values.phone,
         role: resolveTechnicianRole(assignments),
         faculty_assignments: assignments,
+        inventory_type_assignments: values.inventory_type_assignments ?? [],
         telegram_id: values.telegram_id ?? null,
       });
       message.success("Xodim yaratildi");
@@ -183,6 +189,7 @@ export function UsersPage() {
         password: values.password || undefined,
         telegram_id: values.telegram_id ?? null,
         faculty_assignments: values.faculty_assignments ?? [],
+        inventory_type_assignments: values.inventory_type_assignments ?? [],
       });
       message.success("Saqlandi");
       setEditTarget(null);
@@ -268,6 +275,23 @@ export function UsersPage() {
             },
           },
           {
+            title: "Inventar toifalari",
+            key: "inventory_types",
+            render: (_: unknown, record: UserOut) => {
+              const types = record.inventory_type_assignments ?? [];
+              if (types.length === 0) return "-";
+              return (
+                <Space size={4} wrap>
+                  {types.map((t) => (
+                    <Tag key={t} color="blue">
+                      {t}
+                    </Tag>
+                  ))}
+                </Space>
+              );
+            },
+          },
+          {
             title: "Telegram",
             dataIndex: "telegram_id",
             render: (v: number | null) => (
@@ -319,6 +343,7 @@ export function UsersPage() {
                                   faculty_id: a.faculty_id,
                                   role: a.role,
                                 })),
+                                inventory_type_assignments: record.inventory_type_assignments ?? [],
                               });
                             },
                           },
@@ -393,6 +418,18 @@ export function UsersPage() {
             <FacultyAssignmentsList faculties={faculties} />
           </Form.Item>
           <Form.Item
+            name="inventory_type_assignments"
+            label="Inventar toifalari"
+            extra="Bu xodim tanlangan toifadagi inventarga (fakultetidan qat'i nazar) mas'ul texnik xodim bo'ladi"
+          >
+            <Select
+              mode="multiple"
+              allowClear
+              placeholder="Toifalarni tanlang"
+              options={INVENTORY_TYPE_OPTIONS}
+            />
+          </Form.Item>
+          <Form.Item
             name="telegram_id"
             label="Telegram ID (ixtiyoriy)"
             extra="Botga @userinfobot orqali xodimning Telegram ID'sini bilib oling. Bo'sh qoldirsangiz, xodim botda /start bosib telefon raqamini ulashganda avtomatik bog'lanadi."
@@ -420,6 +457,18 @@ export function UsersPage() {
           </Form.Item>
           <Form.Item label="Fakultet biriktirishlar">
             <FacultyAssignmentsList faculties={faculties} />
+          </Form.Item>
+          <Form.Item
+            name="inventory_type_assignments"
+            label="Inventar toifalari"
+            extra="Bu xodim tanlangan toifadagi inventarga (fakultetidan qat'i nazar) mas'ul texnik xodim bo'ladi"
+          >
+            <Select
+              mode="multiple"
+              allowClear
+              placeholder="Toifalarni tanlang"
+              options={INVENTORY_TYPE_OPTIONS}
+            />
           </Form.Item>
           <Form.Item
             name="telegram_id"

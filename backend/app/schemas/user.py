@@ -4,6 +4,7 @@ from pydantic import BaseModel, ConfigDict, Field, model_validator
 
 from app.core.permissions import PERMISSION_ACTIONS, PERMISSION_RESOURCES
 from app.models.enums import TechnicianFacultyRole, UserRole
+from app.schemas.inventory import INVENTORY_TYPE_OPTIONS
 
 if TYPE_CHECKING:
     from app.models.user import User
@@ -64,6 +65,20 @@ def validate_faculty_assignments(role: UserRole, assignments: list[FacultyAssign
     return assignments
 
 
+def validate_inventory_type_assignments(role: UserRole, inventory_types: list[str]) -> list[str]:
+    if role not in TECHNICIAN_ROLES:
+        if inventory_types:
+            raise ValueError("Faqat texnik xodim uchun inventar toifasi biriktirish mumkin")
+        return inventory_types
+
+    invalid = [t for t in inventory_types if t not in INVENTORY_TYPE_OPTIONS]
+    if invalid:
+        raise ValueError(f"Noto'g'ri inventar toifasi: '{', '.join(invalid)}'")
+    if len(inventory_types) != len(set(inventory_types)):
+        raise ValueError("Bitta toifa faqat bir marta tanlanishi mumkin")
+    return inventory_types
+
+
 class UserCreate(BaseModel):
     username: str = Field(min_length=3, max_length=100)
     password: str = Field(min_length=8, max_length=100)
@@ -71,12 +86,14 @@ class UserCreate(BaseModel):
     phone: str = Field(min_length=5, max_length=32)
     role: UserRole
     faculty_assignments: list[FacultyAssignmentIn] = []
+    inventory_type_assignments: list[str] = []
     permissions: dict[str, list[str]] | None = None
     telegram_id: int | None = None
 
     @model_validator(mode="after")
     def _check_assignments(self) -> "UserCreate":
         validate_faculty_assignments(self.role, self.faculty_assignments)
+        validate_inventory_type_assignments(self.role, self.inventory_type_assignments)
         self.permissions = validate_permissions(self.role, self.permissions)
         return self
 
@@ -86,6 +103,7 @@ class UserUpdate(BaseModel):
     phone: str | None = Field(default=None, min_length=5, max_length=32)
     faculty_id: int | None = None
     faculty_assignments: list[FacultyAssignmentIn] | None = None
+    inventory_type_assignments: list[str] | None = None
     permissions: dict[str, list[str]] | None = None
     password: str | None = Field(default=None, min_length=8, max_length=100)
     telegram_id: int | None = None
@@ -101,6 +119,7 @@ class UserOut(BaseModel):
     role: UserRole
     faculty_id: int | None
     faculty_assignments: list[FacultyAssignmentOut] = []
+    inventory_type_assignments: list[str] = []
     permissions: dict[str, list[str]] | None = None
     avatar_url: str | None = None
     telegram_id: int | None
@@ -128,6 +147,7 @@ def serialize_user(user: "User", visible_faculty_ids: set[int] | None = None) ->
             FacultyAssignmentOut(faculty_id=a.faculty_id, faculty_name=a.faculty.name, role=a.role)
             for a in assignments
         ],
+        inventory_type_assignments=[a.inventory_type for a in user.inventory_type_assignments],
         permissions=user.permissions,
         avatar_url=f"/storage/{user.avatar_path}" if user.avatar_path else None,
         telegram_id=user.telegram_id,

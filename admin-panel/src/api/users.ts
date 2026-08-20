@@ -15,6 +15,7 @@ export interface UserCreatePayload {
   phone: string;
   role: UserRole;
   faculty_assignments: FacultyAssignmentInput[];
+  inventory_type_assignments?: string[];
   permissions?: PermissionsInput | null;
   telegram_id?: number | null;
 }
@@ -24,6 +25,7 @@ export interface UserUpdatePayload {
   phone?: string;
   faculty_id?: number | null;
   faculty_assignments?: FacultyAssignmentInput[];
+  inventory_type_assignments?: string[];
   permissions?: PermissionsInput | null;
   password?: string;
   telegram_id?: number | null;
