@@ -7,5 +7,6 @@ PERMISSION_RESOURCES = (
     "faculties",
     "departments",
     "projects",
+    "payments",
 )
 PERMISSION_ACTIONS = ("view", "create", "edit", "delete")

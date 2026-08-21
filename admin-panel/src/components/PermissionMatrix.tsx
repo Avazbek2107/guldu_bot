@@ -15,6 +15,7 @@ const RESOURCE_ORDER: PermissionResource[] = [
   "faculties",
   "departments",
   "projects",
+  "payments",
 ];
 const ALL_ACTIONS: PermissionAction[] = ["view", "create", "edit", "delete"];
 

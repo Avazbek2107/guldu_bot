@@ -30,6 +30,7 @@ import {
   CameraOutlined,
   CrownOutlined,
   ProjectOutlined,
+  WalletOutlined,
 } from "@ant-design/icons";
 import { Outlet, useLocation, useNavigate } from "react-router-dom";
 import { updateProfile, uploadAvatar } from "../api/auth";
@@ -161,6 +162,9 @@ export function AppLayout() {
       : null,
     hasPermission(user, "projects")
       ? { key: "/projects", icon: <ProjectOutlined />, label: "Markaz loyihalar" }
+      : null,
+    hasPermission(user, "payments")
+      ? { key: "/payments", icon: <WalletOutlined />, label: "To'lovlar monitoringi" }
       : null,
     hasPermission(user, "users") ? { key: "/admins", icon: <CrownOutlined />, label: "Boshqaruv" } : null,
   ].filter((item): item is NonNullable<typeof item> => item !== null);

@@ -8,7 +8,8 @@ export type PermissionResource =
   | "end_users"
   | "faculties"
   | "departments"
-  | "projects";
+  | "projects"
+  | "payments";
 
 export type PermissionAction = "view" | "create" | "edit" | "delete";
 
@@ -78,6 +79,22 @@ export interface ProjectOut {
   updated_at: string;
 }
 
+export const PAYMENT_CATEGORY_OPTIONS: string[] = ["Zoom", "SSL", "Internet", "Domen", "Boshqa"];
+
+export interface ServicePaymentOut {
+  id: number;
+  name: string;
+  category: string;
+  amount: number | null;
+  due_date: string;
+  responsible_person: string | null;
+  notes: string | null;
+  status: string;
+  days_left: number;
+  created_at: string;
+  updated_at: string;
+}
+
 export const ROLE_LABELS_UZ: Record<UserRole, string> = {
   super_admin: "Super Admin",
   admin: "Admin",
@@ -95,6 +112,7 @@ export const PERMISSION_RESOURCE_LABELS_UZ: Record<PermissionResource, string> =
   faculties: "Fakultetlar",
   departments: "Bo'limlar",
   projects: "Markaz loyihalar",
+  payments: "To'lovlar monitoringi",
 };
 
 export const PERMISSION_ACTION_LABELS_UZ: Record<PermissionAction, string> = {

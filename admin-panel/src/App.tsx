@@ -16,6 +16,7 @@ const DepartmentsPage = lazy(() =>
 );
 const InventoryPage = lazy(() => import("./pages/InventoryPage").then((m) => ({ default: m.InventoryPage })));
 const ProjectsPage = lazy(() => import("./pages/ProjectsPage").then((m) => ({ default: m.ProjectsPage })));
+const PaymentsPage = lazy(() => import("./pages/PaymentsPage").then((m) => ({ default: m.PaymentsPage })));
 
 function PageFallback() {
   return (
@@ -74,6 +75,9 @@ function App() {
             </Route>
             <Route element={<ProtectedRoute permission={{ resource: "projects" }} />}>
               <Route path="/projects" element={<ProjectsPage />} />
+            </Route>
+            <Route element={<ProtectedRoute permission={{ resource: "payments" }} />}>
+              <Route path="/payments" element={<PaymentsPage />} />
             </Route>
           </Route>
         </Route>

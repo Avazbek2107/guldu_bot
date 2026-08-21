@@ -7,7 +7,7 @@ from jwt import PyJWTError
 from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.api import auth, faculties, inventory, projects, stats, storage, tickets, users
+from app.api import auth, faculties, inventory, projects, service_payments, stats, storage, tickets, users
 from app.core.config import settings
 from app.core.database import get_db
 from app.core.security import decode_access_token
@@ -62,6 +62,7 @@ app.include_router(tickets.router)
 app.include_router(stats.router)
 app.include_router(inventory.router)
 app.include_router(projects.router)
+app.include_router(service_payments.router)
 app.include_router(storage.router)
 
 
