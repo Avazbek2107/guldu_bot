@@ -12,7 +12,7 @@ class LoginRequest(BaseModel):
 
 class CaptchaResponse(BaseModel):
     captcha_token: str
-    image: str
+    image_svg: str
 
 
 class TokenResponse(BaseModel):

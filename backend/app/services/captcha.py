@@ -1,4 +1,3 @@
-import base64
 import hashlib
 import random
 import secrets
@@ -57,8 +56,8 @@ def _render_svg(code: str) -> str:
         )
 
     svg = (
-        f'<svg xmlns="http://www.w3.org/2000/svg" width="{_WIDTH}" height="{_HEIGHT}" '
-        f'viewBox="0 0 {_WIDTH} {_HEIGHT}">'
+        '<svg xmlns="http://www.w3.org/2000/svg" width="100%" height="100%" '
+        f'viewBox="0 0 {_WIDTH} {_HEIGHT}" preserveAspectRatio="xMidYMid meet">'
         '<defs><filter id="warp" x="-20%" y="-20%" width="140%" height="140%">'
         f'<feTurbulence type="fractalNoise" baseFrequency="0.01 0.1" numOctaves="2" seed="{seed}" result="turb"/>'
         '<feDisplacementMap in="SourceGraphic" in2="turb" scale="6"/>'
@@ -72,16 +71,20 @@ def _render_svg(code: str) -> str:
 @dataclass
 class CaptchaChallenge:
     captcha_token: str
-    image: str
+    image_svg: str
 
 
 def create_captcha() -> CaptchaChallenge:
     code = "".join(secrets.choice(_CAPTCHA_CHARS) for _ in range(_CODE_LENGTH))
     jti = uuid.uuid4().hex
     token = create_captcha_token(jti, _hash_code(code), _EXPIRE_MINUTES)
+    # Sent as raw SVG markup — not a data: URI for an <img> tag — because
+    # Safari/WebKit (both desktop and iOS) silently drops SVG <filter>
+    # effects (the feTurbulence/feDisplacementMap warp) on SVGs loaded as an
+    # external image resource. Inlining the markup into the page's own DOM
+    # is the only reliably cross-browser way to keep the filter rendering.
     svg = _render_svg(code)
-    image = "data:image/svg+xml;base64," + base64.b64encode(svg.encode("utf-8")).decode("ascii")
-    return CaptchaChallenge(captcha_token=token, image=image)
+    return CaptchaChallenge(captcha_token=token, image_svg=svg)
 
 
 def verify_and_consume_captcha(token: str, answer: str) -> bool:

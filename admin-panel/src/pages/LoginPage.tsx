@@ -128,10 +128,22 @@ export function LoginPage() {
           <Form.Item label="Tekshiruv kodi">
             <Space.Compact block>
               {captcha ? (
-                <img
-                  src={captcha.image}
-                  alt="Captcha"
-                  style={{ height: 40, width: 112, borderRadius: "8px 0 0 8px", border: "1px solid #d9d9d9", borderRight: "none" }}
+                // Rendered inline (not via <img src="data:...">) because
+                // Safari/WebKit drops SVG <filter> effects — the captcha's
+                // wavy distortion — on SVGs loaded as an external image
+                // resource; this markup comes only from our own backend.
+                <div
+                  dangerouslySetInnerHTML={{ __html: captcha.image_svg }}
+                  style={{
+                    height: 40,
+                    width: 112,
+                    borderRadius: "8px 0 0 8px",
+                    border: "1px solid #d9d9d9",
+                    borderRight: "none",
+                    overflow: "hidden",
+                    display: "flex",
+                    alignItems: "center",
+                  }}
                 />
               ) : (
                 <div

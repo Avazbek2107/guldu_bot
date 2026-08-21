@@ -58,7 +58,7 @@ def _set_auth_cookie(response: Response, token: str) -> None:
 @router.get("/captcha", response_model=CaptchaResponse)
 async def get_captcha():
     challenge = create_captcha()
-    return CaptchaResponse(captcha_token=challenge.captcha_token, image=challenge.image)
+    return CaptchaResponse(captcha_token=challenge.captcha_token, image_svg=challenge.image_svg)
 
 
 @router.post("/login", response_model=TokenResponse)

@@ -8,7 +8,7 @@ export interface AuthResponse {
 
 export interface CaptchaResponse {
   captcha_token: string;
-  image: string;
+  image_svg: string;
 }
 
 export async function getCaptcha(): Promise<CaptchaResponse> {
