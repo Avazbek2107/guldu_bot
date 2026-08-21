@@ -7,7 +7,8 @@ export type PermissionResource =
   | "users"
   | "end_users"
   | "faculties"
-  | "departments";
+  | "departments"
+  | "projects";
 
 export type PermissionAction = "view" | "create" | "edit" | "delete";
 
@@ -65,6 +66,18 @@ export const INVENTORY_TYPES: string[] = [
   "HUB",
 ];
 
+export const PROJECT_STATUS_OPTIONS: string[] = ["Rejalashtirilgan", "Jarayonda", "Yakunlangan", "To'xtatilgan"];
+
+export interface ProjectOut {
+  id: number;
+  name: string;
+  description: string | null;
+  status: string;
+  responsible_person: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
 export const ROLE_LABELS_UZ: Record<UserRole, string> = {
   super_admin: "Super Admin",
   admin: "Admin",
@@ -81,6 +94,7 @@ export const PERMISSION_RESOURCE_LABELS_UZ: Record<PermissionResource, string> =
   end_users: "Foydalanuvchilar",
   faculties: "Fakultetlar",
   departments: "Bo'limlar",
+  projects: "Markaz loyihalar",
 };
 
 export const PERMISSION_ACTION_LABELS_UZ: Record<PermissionAction, string> = {
