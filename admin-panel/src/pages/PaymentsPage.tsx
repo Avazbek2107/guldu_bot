@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { Button, Card, DatePicker, Form, Input, InputNumber, Modal, Select, Space, Table, Tag, message } from "antd";
+import { Button, Card, DatePicker, Form, Input, Modal, Select, Space, Table, Tag, message } from "antd";
 import { PlusOutlined } from "@ant-design/icons";
 import dayjs, { type Dayjs } from "dayjs";
 import {
@@ -27,7 +27,6 @@ const STATUS_COLORS: Record<string, string> = {
 interface FormValues {
   name: string;
   category: string;
-  amount?: number | null;
   due_date: Dayjs;
   responsible_person?: string;
   notes?: string;
@@ -65,7 +64,6 @@ export function PaymentsPage() {
     return {
       name: values.name,
       category: values.category,
-      amount: values.amount ?? null,
       due_date: values.due_date.format("YYYY-MM-DD"),
       responsible_person: values.responsible_person || null,
       notes: values.notes || null,
@@ -131,11 +129,6 @@ export function PaymentsPage() {
           columns={[
             { title: "Nomi", dataIndex: "name" },
             { title: "Turi", dataIndex: "category" },
-            {
-              title: "Summasi",
-              dataIndex: "amount",
-              render: (v: number | null) => (v != null ? v.toLocaleString("uz-UZ") : "-"),
-            },
             { title: "Muddati", dataIndex: "due_date" },
             {
               title: "Holati",
@@ -169,7 +162,6 @@ export function PaymentsPage() {
                                     editForm.setFieldsValue({
                                       name: record.name,
                                       category: record.category,
-                                      amount: record.amount ?? undefined,
                                       due_date: dayjs(record.due_date),
                                       responsible_person: record.responsible_person ?? undefined,
                                       notes: record.notes ?? undefined,
@@ -215,9 +207,6 @@ export function PaymentsPage() {
           <Form.Item name="category" label="Turi" rules={[{ required: true }]}>
             <Select options={CATEGORY_OPTIONS} />
           </Form.Item>
-          <Form.Item name="amount" label="Summasi">
-            <InputNumber style={{ width: "100%" }} min={0} placeholder="Masalan: 150000" />
-          </Form.Item>
           <Form.Item name="due_date" label="To'lov/amal qilish muddati" rules={[{ required: true }]}>
             <DatePicker style={{ width: "100%" }} format="YYYY-MM-DD" />
           </Form.Item>
@@ -245,9 +234,6 @@ export function PaymentsPage() {
           </Form.Item>
           <Form.Item name="category" label="Turi" rules={[{ required: true }]}>
             <Select options={CATEGORY_OPTIONS} />
-          </Form.Item>
-          <Form.Item name="amount" label="Summasi">
-            <InputNumber style={{ width: "100%" }} min={0} />
           </Form.Item>
           <Form.Item name="due_date" label="To'lov/amal qilish muddati" rules={[{ required: true }]}>
             <DatePicker style={{ width: "100%" }} format="YYYY-MM-DD" />

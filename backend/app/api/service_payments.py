@@ -22,7 +22,6 @@ def _to_out(payment: ServicePayment) -> ServicePaymentOut:
         id=payment.id,
         name=payment.name,
         category=payment.category,
-        amount=float(payment.amount) if payment.amount is not None else None,
         due_date=payment.due_date,
         responsible_person=payment.responsible_person,
         notes=payment.notes,

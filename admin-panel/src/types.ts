@@ -85,7 +85,6 @@ export interface ServicePaymentOut {
   id: number;
   name: string;
   category: string;
-  amount: number | null;
   due_date: string;
   responsible_person: string | null;
   notes: string | null;

@@ -4,7 +4,6 @@ import type { ServicePaymentOut } from "../types";
 export interface ServicePaymentPayload {
   name: string;
   category: string;
-  amount?: number | null;
   due_date: string;
   responsible_person?: string | null;
   notes?: string | null;

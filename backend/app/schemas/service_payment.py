@@ -23,7 +23,6 @@ def compute_payment_status(due_date: date, today: date | None = None) -> tuple[s
 class ServicePaymentCreate(BaseModel):
     name: str = Field(min_length=1, max_length=255)
     category: str = Field(max_length=64)
-    amount: float | None = None
     due_date: date
     responsible_person: str | None = None
     notes: str | None = None
@@ -32,7 +31,6 @@ class ServicePaymentCreate(BaseModel):
 class ServicePaymentUpdate(BaseModel):
     name: str | None = Field(default=None, min_length=1, max_length=255)
     category: str | None = Field(default=None, max_length=64)
-    amount: float | None = None
     due_date: date | None = None
     responsible_person: str | None = None
     notes: str | None = None
@@ -44,7 +42,6 @@ class ServicePaymentOut(BaseModel):
     id: int
     name: str
     category: str
-    amount: float | None
     due_date: date
     responsible_person: str | None
     notes: str | None
